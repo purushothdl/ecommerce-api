@@ -19,3 +19,7 @@ migratedown:
 run:
 	@echo "Starting server..."
 	go run ./cmd/api/main.go
+
+hashtest:
+	@echo "Running hash test..."
+	go run ./hashtest/main.go

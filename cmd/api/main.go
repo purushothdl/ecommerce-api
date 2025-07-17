@@ -1,39 +1,53 @@
-// cmd/api/main.go
 package main
 
 import (
-	"database/sql"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/purushothdl/ecommerce-api/configs"
+	"github.com/purushothdl/ecommerce-api/internal/auth"
+	"github.com/purushothdl/ecommerce-api/internal/database"
 	"github.com/purushothdl/ecommerce-api/internal/server"
+	"github.com/purushothdl/ecommerce-api/internal/user"
 )
+
+type application struct {
+	config      *configs.Config
+	logger      *log.Logger
+	userService user.Service
+	authService auth.Service
+}
 
 func main() {
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
 	cfg := configs.LoadConfig()
 
-	db, err := sql.Open("pgx", cfg.DB.DSN)
+	// Initialize database connection
+	db, err := database.NewPostgres(cfg.DB)
 	if err != nil {
-		logger.Fatalf("could not connect to database: %v", err)
+		logger.Fatal(err)
 	}
 	defer db.Close()
-	if err := db.Ping(); err != nil {
-		logger.Fatalf("database not responding: %v", err)
+
+	// Dependency injection
+	userRepo := user.NewRepository(db)
+	userService := user.NewService(userRepo)
+	authService := auth.NewService(userService)
+
+	app := &application{
+		config:      cfg,
+		logger:      logger,
+		userService: userService,
+		authService: authService,
 	}
-	logger.Println("Database connection established.")
 
-	// Create a new instance of our server.
-	// We need to pass it the dependencies it needs.
-	// Let's modify the server struct and New function to accept these.
-
-	srv := server.New(cfg, db, logger)
-
-	// Start the server.
+	// Start server
+	srv := server.New(app.config, app.logger, app.userService, app.authService)
 	logger.Printf("Starting %s server on port %d", cfg.Env, cfg.Port)
-	if err := srv.Start(); err != nil {
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), srv.Router()); err != nil {
 		logger.Fatalf("could not start server: %v", err)
 	}
 }

@@ -11,20 +11,27 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type UserServiceInterface interface {
+// UserFinder describes any type that can find a user by email.
+// This interface lives INSIDE the auth package.
+type UserFinder interface {
 	GetByEmail(ctx context.Context, email string) (*models.User, error)
 }
 
-type Service struct {
-	userService UserServiceInterface
+// Service defines the business logic for authentication.
+type Service interface {
+	Login(ctx context.Context, email, password string) (*models.User, error)
 }
 
-func NewService(userService UserServiceInterface) *Service {
-	return &Service{userService: userService}
+type service struct {
+	userFinder UserFinder
 }
 
-func (s *Service) Login(ctx context.Context, email, password string) (*models.User, error) {
-	user, err := s.userService.GetByEmail(ctx, email)
+func NewService(userFinder UserFinder) *service {
+	return &service{userFinder: userFinder}
+}
+
+func (s *service) Login(ctx context.Context, email, password string) (*models.User, error) {
+	user, err := s.userFinder.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrUserNotFound) {
 			return nil, errors.New("invalid credentials")

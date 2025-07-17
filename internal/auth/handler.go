@@ -1,3 +1,4 @@
+// auth/handler.go (The corrected version)
 package auth
 
 import (
@@ -11,11 +12,11 @@ import (
 )
 
 type Handler struct {
-	authService *Service
+	authService Service
 	jwtSecret   string
 }
 
-func NewHandler(authService *Service, jwtSecret string) *Handler {
+func NewHandler(authService Service, jwtSecret string) *Handler {
 	return &Handler{
 		authService: authService,
 		jwtSecret:   jwtSecret,

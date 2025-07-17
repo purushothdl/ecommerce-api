@@ -7,29 +7,25 @@ import (
 	"fmt"
 
 	"github.com/purushothdl/ecommerce-api/internal/models"
-	"github.com/purushothdl/ecommerce-api/pkg/errors"
+	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
 	"github.com/purushothdl/ecommerce-api/pkg/utils/crypto"
 )
 
-// Repository is an interface that our data layer must satisfy.
-// This is for decoupling and easier testing.
-type RepositoryInterface interface {
-	Insert(ctx context.Context, user *models.User) error
+// Service defines the business logic operations for users
+type Service interface {
+	Register(ctx context.Context, name, email, password string) (*models.User, error)
 	GetByEmail(ctx context.Context, email string) (*models.User, error)
 }
 
-// Service provides user-related business logic.
-type Service struct {
-	repo RepositoryInterface
+type service struct {
+	repo Repository
 }
 
-// NewService creates a new user service.
-func NewService(repo RepositoryInterface) *Service {
-	return &Service{repo: repo}
+func NewService(repo Repository) Service {
+	return &service{repo: repo}
 }
 
-// Register handles the business logic for creating a new user.
-func (s *Service) Register(ctx context.Context, name, email, password string) (*models.User, error) {
+func (s *service) Register(ctx context.Context, name, email, password string) (*models.User, error) {
 	passwordHash, err := crypto.HashPassword(password)
 	if err != nil {
 		return nil, fmt.Errorf("could not hash password: %w", err)
@@ -52,7 +48,7 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (*
 	return user, nil
 }
 
-func (s *Service) GetByEmail(ctx context.Context, email string) (*models.User, error) {
+func (s *service) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	user, err := s.repo.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrUserNotFound) {

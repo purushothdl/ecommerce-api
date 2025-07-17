@@ -7,15 +7,10 @@ import (
 	"github.com/purushothdl/ecommerce-api/internal/user"
 )
 
-func (s *Server) RegisterRoutes() {
-	// Initialize dependencies
-	userRepo := user.NewRepository(s.db)
-	
-	userService := user.NewService(userRepo)
-	authService := auth.NewService(userService)
-
-	userHandler := user.NewHandler(userService)
-	authHandler := auth.NewHandler(authService, s.config.JWT.Secret)
+func (s *Server) registerRoutes() {
+	// Create handlers using the dependencies from the server struct.
+	userHandler := user.NewHandler(s.userService)
+	authHandler := auth.NewHandler(s.authService, s.config.JWT.Secret)
 
 	// Public routes
 	s.router.Post("/users", userHandler.HandleRegister)

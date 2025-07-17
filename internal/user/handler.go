@@ -2,28 +2,22 @@
 package user
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/purushothdl/ecommerce-api/internal/auth"
-	"github.com/purushothdl/ecommerce-api/internal/models"
 	"github.com/purushothdl/ecommerce-api/pkg/errors"
 	"github.com/purushothdl/ecommerce-api/pkg/response"
 	"github.com/purushothdl/ecommerce-api/pkg/validator"
 )
 
-type ServiceInterface interface {
-	Register(ctx context.Context, name, email, password string) (*models.User, error)
-}
-
 type Handler struct {
-	service ServiceInterface
+	service Service
 }
 
-func NewHandler(service ServiceInterface) *Handler {
+func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
 }
 

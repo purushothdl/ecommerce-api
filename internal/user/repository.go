@@ -10,18 +10,25 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/purushothdl/ecommerce-api/internal/models"
-	"github.com/purushothdl/ecommerce-api/pkg/errors"
+	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
 )
 
-type Repository struct {
+// Repository defines the data access methods for users
+type Repository interface {
+	Insert(ctx context.Context, user *models.User) error
+	GetByEmail(ctx context.Context, email string) (*models.User, error)
+}
+
+// repository implements the Repository interface
+type repository struct {
 	db *sql.DB
 }
 
-func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db}
+func NewRepository(db *sql.DB) Repository {
+	return &repository{db: db}
 }
 
-func (r *Repository) Insert(ctx context.Context, user *models.User) error {
+func (r *repository) Insert(ctx context.Context, user *models.User) error {
 	query := `
         INSERT INTO users (name, email, password_hash, role)
         VALUES ($1, $2, $3, $4)
@@ -42,7 +49,7 @@ func (r *Repository) Insert(ctx context.Context, user *models.User) error {
 	return nil
 }
 
-func (r *Repository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
+func (r *repository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `
         SELECT id, created_at, name, email, password_hash, role, version
         FROM users

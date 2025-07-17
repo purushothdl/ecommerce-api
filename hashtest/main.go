@@ -17,7 +17,7 @@ func main() {
 	for i := range 5 {
 		startTime := time.Now()
 
-		_, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+		_, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 		if err != nil {
 			log.Fatalf("Hashing failed: %v", err)
 		}

@@ -2,41 +2,36 @@
 package server
 
 import (
-	"database/sql"
-	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/purushothdl/ecommerce-api/configs"
+	"github.com/purushothdl/ecommerce-api/internal/auth"
+	"github.com/purushothdl/ecommerce-api/internal/user"
 )
 
 type Server struct {
-	config  *configs.Config
-	router  *chi.Mux
-	db      *sql.DB
-	logger  *log.Logger
+	config      *configs.Config
+	logger      *log.Logger
+	router      *chi.Mux
+	userService user.Service
+	authService auth.Service
 }
 
-func New(config *configs.Config, db *sql.DB, logger *log.Logger) *Server {
+func New(config *configs.Config, logger *log.Logger, userService user.Service, authService auth.Service) *Server {
 	s := &Server{
-		config:  config,
-		router:  chi.NewMux(),
-		db:      db,
-		logger:  logger,
+		config:      config,
+		logger:      logger,
+		router:      chi.NewMux(),
+		userService: userService,
+		authService: authService,
 	}
+	s.registerRoutes() 
 	return s
 }
 
-// Start begins listening for HTTP requests.
-func (s *Server) Start() error {
-	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.config.Port),
-		Handler: s.router,
-	}
-
-	// We'll call RegisterRoutes here to set up all the handlers.
-	s.RegisterRoutes()
-
-	return server.ListenAndServe()
+// Router returns the server's router.
+func (s *Server) Router() http.Handler {
+	return s.router
 }
