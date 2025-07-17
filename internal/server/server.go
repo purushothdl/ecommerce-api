@@ -2,7 +2,7 @@
 package server
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -13,13 +13,13 @@ import (
 
 type Server struct {
 	config      *configs.Config
-	logger      *log.Logger
+	logger      *slog.Logger
 	router      *chi.Mux
 	userService user.Service
 	authService auth.Service
 }
 
-func New(config *configs.Config, logger *log.Logger, userService user.Service, authService auth.Service) *Server {
+func New(config *configs.Config, logger *slog.Logger, userService user.Service, authService auth.Service) *Server {
 	s := &Server{
 		config:      config,
 		logger:      logger,

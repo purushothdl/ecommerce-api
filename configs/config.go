@@ -2,7 +2,6 @@
 package configs
 
 import (
-	"log"
 	"os"
 	"strconv"
 
@@ -25,10 +24,7 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("No .env file found, using environment variables")
-	}
+	godotenv.Load() // It's okay if this fails, we have fallbacks.
 
 	return &Config{
 		Env:  getEnv("ENV", "development"),
@@ -41,10 +37,8 @@ func LoadConfig() *Config {
 // Helper function to read an environment variable or return a default.
 func getEnv(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists {
-		log.Printf("Using %s=%s", key, value)
 		return value
 	}
-	log.Printf("Using default for %s=%s", key, fallback)
 	return fallback
 }
 
@@ -55,7 +49,6 @@ func getEnvAsInt(key string, fallback int) int {
 			if value > 0 && value < 65536 { // Valid port range
 				return value
 			}
-			log.Printf("Invalid port %d, using default %d", value, fallback)
 		}
 	}
 	return fallback
