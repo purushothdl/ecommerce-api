@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/purushothdl/ecommerce-api/internal/auth"
@@ -54,8 +53,6 @@ func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
-	// Add a 6 second delay
-	time.Sleep(6 * time.Second)
 
 	// Retrieve user details from the context
 	userCtx, ok := r.Context().Value(auth.UserContextKey).(struct {
