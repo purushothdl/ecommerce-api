@@ -3,13 +3,12 @@ package user
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 
-	"github.com/purushothdl/ecommerce-api/pkg/utils/crypto"
 	"github.com/purushothdl/ecommerce-api/internal/models"
-	"golang.org/x/crypto/bcrypt"
+	"github.com/purushothdl/ecommerce-api/pkg/errors"
+	"github.com/purushothdl/ecommerce-api/pkg/utils/crypto"
 )
 
 // Repository is an interface that our data layer must satisfy.
@@ -40,36 +39,26 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (*
 		Name:         name,
 		Email:        email,
 		PasswordHash: string(passwordHash),
-		Role:         "user", 
+		Role:         "user",
 	}
 
 	err = s.repo.Insert(ctx, user)
 	if err != nil {
-		if errors.Is(err, ErrDuplicateEmail) {
-			return nil, ErrDuplicateEmail
+		if errors.Is(err, apperrors.ErrDuplicateEmail) {
+			return nil, apperrors.ErrDuplicateEmail
 		}
 		return nil, fmt.Errorf("could not register user: %w", err)
 	}
 	return user, nil
 }
 
-// Login handles business logic for user authentication.
-func (s *Service) Login(ctx context.Context, email, password string) (*models.User, error) {
+func (s *Service) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	user, err := s.repo.GetByEmail(ctx, email)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errors.New("invalid credentials")
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			return nil, apperrors.ErrUserNotFound
 		}
-		return nil, fmt.Errorf("could not process login: %w", err)
+		return nil, fmt.Errorf("could not get user by email: %w", err)
 	}
-
-	err = crypto.CheckPasswordHash(password, user.PasswordHash)
-	if err != nil {
-		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return nil, errors.New("invalid credentials")
-		}
-		return nil, fmt.Errorf("could not process login: %w", err)
-	}
-
 	return user, nil
 }

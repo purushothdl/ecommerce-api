@@ -9,24 +9,18 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/purushothdl/ecommerce-api/internal/models" 
+	"github.com/purushothdl/ecommerce-api/internal/models"
+	"github.com/purushothdl/ecommerce-api/pkg/errors"
 )
 
-var (
-	ErrDuplicateEmail = errors.New("duplicate email")
-)
-
-// Repository provides access to the user storage.
 type Repository struct {
 	db *sql.DB
 }
 
-// NewRepository creates a new user repository.
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
-// Insert inserts a new user record into the database.
 func (r *Repository) Insert(ctx context.Context, user *models.User) error {
 	query := `
         INSERT INTO users (name, email, password_hash, role)
@@ -41,14 +35,13 @@ func (r *Repository) Insert(ctx context.Context, user *models.User) error {
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return ErrDuplicateEmail
+			return apperrors.ErrDuplicateEmail
 		}
 		return fmt.Errorf("user repository: failed to insert user: %w", err)
 	}
 	return nil
 }
 
-// GetByEmail retrieves a user by their email address.
 func (r *Repository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `
         SELECT id, created_at, name, email, password_hash, role, version
@@ -70,7 +63,7 @@ func (r *Repository) GetByEmail(ctx context.Context, email string) (*models.User
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, sql.ErrNoRows
+			return nil, apperrors.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("user repository: failed to get user by email: %w", err)
 	}

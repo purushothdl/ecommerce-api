@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/purushothdl/ecommerce-api/configs"
-	"github.com/purushothdl/ecommerce-api/internal/server" 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/purushothdl/ecommerce-api/configs"
+	"github.com/purushothdl/ecommerce-api/internal/server"
 )
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 	// We need to pass it the dependencies it needs.
 	// Let's modify the server struct and New function to accept these.
 
-	srv := server.New(cfg, db, logger) 
+	srv := server.New(cfg, db, logger)
 
 	// Start the server.
 	logger.Printf("Starting %s server on port %d", cfg.Env, cfg.Port)

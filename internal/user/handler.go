@@ -8,47 +8,46 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/purushothdl/ecommerce-api/pkg/response"
+	"github.com/purushothdl/ecommerce-api/internal/auth"
 	"github.com/purushothdl/ecommerce-api/internal/models"
+	"github.com/purushothdl/ecommerce-api/pkg/errors"
+	"github.com/purushothdl/ecommerce-api/pkg/response"
+	"github.com/purushothdl/ecommerce-api/pkg/validator"
 )
 
-// ServiceInterface defines the methods our handler needs from the user service.
 type ServiceInterface interface {
 	Register(ctx context.Context, name, email, password string) (*models.User, error)
 }
 
-// Handler provides HTTP handlers for user-related routes.
 type Handler struct {
 	service ServiceInterface
 }
 
-// NewHandler creates a new user handler.
 func NewHandler(service ServiceInterface) *Handler {
 	return &Handler{service: service}
 }
 
-// RegisterRoutes registers the user routes with a chi router.
 func (h *Handler) RegisterRoutes(r *chi.Mux) {
 	r.Post("/users", h.HandleRegister)
+	r.Get("/profile", h.HandleGetProfile)
 }
 
-// handleRegister handles the user registration request.
 func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
+	var input CreateUserRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		response.Error(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
+	v := validator.New()
 
-	// Call the service layer to perform the business logic.
+	if input.Validate(v); !v.Valid() {
+		response.JSON(w, http.StatusUnprocessableEntity, v.Errors)
+		return
+	}
 	user, err := h.service.Register(r.Context(), input.Name, input.Email, input.Password)
 	if err != nil {
-		if errors.Is(err, ErrDuplicateEmail) {
+		if errors.Is(err, apperrors.ErrDuplicateEmail) {
 			response.Error(w, http.StatusConflict, "Email address is already in use")
 		} else {
 			response.Error(w, http.StatusInternalServerError, "Could not create user")
@@ -57,4 +56,27 @@ func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.JSON(w, http.StatusCreated, user)
+}
+
+func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
+	// Retrieve user details from the context
+	userCtx, ok := r.Context().Value(auth.UserContextKey).(struct {
+		ID    int64
+		Name  string
+		Email string
+		Role  string
+	})
+	if !ok {
+		response.Error(w, http.StatusInternalServerError, "error retrieving user from context")
+		return
+	}
+
+	// Return user details
+	response.JSON(w, http.StatusOK, map[string]any{
+		"message": "Welcome to your protected profile!",
+		"user_id": userCtx.ID,
+		"name":    userCtx.Name,
+		"email":   userCtx.Email,
+		"role":    userCtx.Role,
+	})
 }

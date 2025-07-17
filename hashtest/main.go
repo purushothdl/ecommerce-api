@@ -14,8 +14,7 @@ func main() {
 
 	fmt.Println("Running bcrypt benchmark...")
 
-	// Run it multiple times to see the variation
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		startTime := time.Now()
 
 		_, err := bcrypt.GenerateFromPassword([]byte(password), 10)

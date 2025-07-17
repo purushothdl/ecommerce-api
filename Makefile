@@ -1,5 +1,5 @@
 # Makefile
-.PHONY: migrateup migratedown
+.PHONY: migrateup migratedown run
 
 # Load environment variables from .env file
 include .env
@@ -15,3 +15,7 @@ migrateup:
 migratedown:
 	@echo "Running migrations down..."
 	migrate -database $(MIGRATE_DSN) -path migrations down
+
+run:
+	@echo "Starting server..."
+	go run ./cmd/api/main.go
