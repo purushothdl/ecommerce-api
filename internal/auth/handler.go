@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/purushothdl/ecommerce-api/pkg/response"
 	"github.com/purushothdl/ecommerce-api/pkg/validator"
 )
@@ -21,10 +20,6 @@ func NewHandler(authService Service, jwtSecret string) *Handler {
 		authService: authService,
 		jwtSecret:   jwtSecret,
 	}
-}
-
-func (h *Handler) RegisterRoutes(r *chi.Mux) {
-	r.Post("/login", h.HandleLogin)
 }
 
 func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {

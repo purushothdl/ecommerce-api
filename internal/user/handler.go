@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/purushothdl/ecommerce-api/internal/auth"
 	"github.com/purushothdl/ecommerce-api/pkg/errors"
 	"github.com/purushothdl/ecommerce-api/pkg/response"
@@ -19,11 +18,6 @@ type Handler struct {
 
 func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
-}
-
-func (h *Handler) RegisterRoutes(r *chi.Mux) {
-	r.Post("/users", h.HandleRegister)
-	r.Get("/profile", h.HandleGetProfile)
 }
 
 func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
