@@ -41,7 +41,7 @@ func main() {
 
 	userRepo := user.NewRepository(db)
 	userService := user.NewService(userRepo)
-	authService := auth.NewService(userService)
+	authService := auth.NewService(userRepo)
 
 	app := &application{
 		config:      cfg,

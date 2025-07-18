@@ -4,7 +4,6 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/purushothdl/ecommerce-api/pkg/response"
 	"github.com/purushothdl/ecommerce-api/pkg/validator"
@@ -36,20 +35,69 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.authService.Login(r.Context(), input.Email, input.Password)
+	user, refreshToken, err := h.authService.Login(r.Context(), input.Email, input.Password)
 	if err != nil {
 		response.Error(w, http.StatusUnauthorized, "Invalid email or password")
 		return
 	}
 
-	token, err := GenerateToken(user, h.jwtSecret, 24*time.Hour)
+	accessToken, err := GenerateAccessToken(user, h.jwtSecret)
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, "Could not generate authentication token")
 		return
 	}
 
 	response.JSON(w, http.StatusOK, map[string]string{
-		"token_type":   "Bearer",
-		"access_token": token,
+		"access_token":  accessToken,
+		"refresh_token": refreshToken.Token,
 	})
+}
+
+// New handler for refreshing tokens
+func (h *Handler) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
+	var input RefreshTokenRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	v := validator.New()
+	if input.Validate(v); !v.Valid() {
+		response.JSON(w, http.StatusUnprocessableEntity, v.Errors)
+		return
+	}
+
+	user, _, err := h.authService.RefreshToken(r.Context(), input.RefreshToken)
+	if err != nil {
+		response.Error(w, http.StatusUnauthorized, "Invalid or expired refresh token")
+		return
+	}
+
+	// If refresh token is valid, issue a new access token
+	accessToken, err := GenerateAccessToken(user, h.jwtSecret)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, "Could not generate new access token")
+		return
+	}
+
+	response.JSON(w, http.StatusOK, map[string]string{
+		"access_token": accessToken,
+	})
+}
+
+func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
+	var input RefreshTokenRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	if err := h.authService.Logout(r.Context(), input.RefreshToken); err != nil {
+		response.Error(w, http.StatusInternalServerError, "Could not revoke token")
+		return
+	}
+
+	response.JSON(w, http.StatusOK, map[string]string{"message": "Logged out successfully"})
 }

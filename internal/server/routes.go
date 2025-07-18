@@ -15,6 +15,8 @@ func (s *Server) registerRoutes() {
 	// Public routes
 	s.router.Post("/users", userHandler.HandleRegister)
 	s.router.Post("/login", authHandler.HandleLogin)
+	s.router.Post("/auth/refresh", authHandler.HandleRefreshToken)
+	s.router.Post("/logout", authHandler.HandleLogout) 
 
 	// Protected routes
 	s.router.Group(func(r chi.Router) {

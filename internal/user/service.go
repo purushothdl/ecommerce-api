@@ -15,6 +15,7 @@ import (
 type Service interface {
 	Register(ctx context.Context, name, email, password string) (*models.User, error)
 	GetByEmail(ctx context.Context, email string) (*models.User, error)
+	GetRefreshToken(ctx context.Context, tokenPlaintext string) (*models.RefreshToken, error)
 }
 
 type service struct {
@@ -57,4 +58,8 @@ func (s *service) GetByEmail(ctx context.Context, email string) (*models.User, e
 		return nil, fmt.Errorf("could not get user by email: %w", err)
 	}
 	return user, nil
+}
+
+func (s *service) GetRefreshToken(ctx context.Context, tokenPlaintext string) (*models.RefreshToken, error) {
+	return s.repo.GetRefreshToken(ctx, tokenPlaintext)
 }
