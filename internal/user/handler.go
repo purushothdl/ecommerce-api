@@ -47,7 +47,6 @@ func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
-
 	// Retrieve user details from the context
 	userCtx, ok := r.Context().Value(auth.UserContextKey).(struct {
 		ID    int64
@@ -60,7 +59,6 @@ func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return user details
 	response.JSON(w, http.StatusOK, map[string]any{
 		"message": "Welcome to your protected profile!",
 		"user_id": userCtx.ID,
