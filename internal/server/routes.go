@@ -8,19 +8,34 @@ import (
 )
 
 func (s *Server) registerRoutes() {
-	// Create handlers using the dependencies from the server struct.
 	userHandler := user.NewHandler(s.userService)
 	authHandler := auth.NewHandler(s.authService, s.config.JWT.Secret)
 
-	// Public routes
-	s.router.Post("/users", userHandler.HandleRegister)
-	s.router.Post("/login", authHandler.HandleLogin)
-	s.router.Post("/auth/refresh", authHandler.HandleRefreshToken)
-	s.router.Post("/logout", authHandler.HandleLogout) 
+	// API versioning
+	s.router.Route("/api/v1", func(r chi.Router) {
+		s.registerV1Routes(r, userHandler, authHandler)
+	})
+}
+
+func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authHandler *auth.Handler) {
+	// Auth routes
+	r.Group(func(r chi.Router) {
+		r.Use(s.timeoutMiddleware(s.config.Timeouts.Auth))
+		r.Post("/auth/login", authHandler.HandleLogin)
+		r.Post("/auth/refresh", authHandler.HandleRefreshToken)
+		r.Post("/auth/logout", authHandler.HandleLogout)
+	})
+
+	// User registration routes
+	r.Group(func(r chi.Router) {
+		r.Use(s.timeoutMiddleware(s.config.Timeouts.UserOps))
+		r.Post("/users", userHandler.HandleRegister)
+	})
 
 	// Protected routes
-	s.router.Group(func(r chi.Router) {
+	r.Group(func(r chi.Router) {
 		r.Use(s.authMiddleware)
-		r.Get("/profile", userHandler.HandleGetProfile)
+		r.Use(s.timeoutMiddleware(s.config.Timeouts.Protected))
+		r.Get("/users/profile", userHandler.HandleGetProfile)
 	})
 }

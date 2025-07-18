@@ -2,39 +2,119 @@
 package configs
 
 import (
+	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
 
+type Config struct {
+	Env      string
+	Port     int
+	DB       DBConfig
+	JWT      JWTConfig
+	Server   ServerConfig
+	Timeouts TimeoutConfig
+}
+
 type DBConfig struct {
-	DSN string
+	DSN             string
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
 }
 
 type JWTConfig struct {
-	Secret string
+	Secret               string
+	AccessTokenDuration  time.Duration
+	RefreshTokenDuration time.Duration
 }
 
-type Config struct {
-	Port int
-	Env  string
-	DB   DBConfig
-	JWT  JWTConfig
+type ServerConfig struct {
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
+	ShutdownTimeout   time.Duration
+	GracefulShutdown  bool
 }
 
-func LoadConfig() *Config {
-	godotenv.Load() // It's okay if this fails, we have fallbacks.
+type TimeoutConfig struct {
+	Auth      time.Duration
+	UserOps   time.Duration
+	Protected time.Duration
+	Database  time.Duration
+}
 
-	return &Config{
+func LoadConfig() (*Config, error) {
+	// Load .env file if it exists (ignore error in production)
+	if err := godotenv.Load(); err != nil && os.Getenv("ENV") != "production" {
+		// Only log in development
+		fmt.Printf("Warning: .env file not found: %v\n", err)
+	}
+
+	cfg := &Config{
 		Env:  getEnv("ENV", "development"),
 		Port: getEnvAsInt("PORT", 8080),
-		DB:   DBConfig{DSN: getEnv("DB_DSN", "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable")},
-		JWT:  JWTConfig{Secret: getEnv("JWT_SECRET", "default-secret")},
+		
+		DB: DBConfig{
+			DSN:             getEnv("DB_DSN", "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"),
+			MaxOpenConns:    getEnvAsInt("DB_MAX_OPEN_CONNS", 25),
+			MaxIdleConns:    getEnvAsInt("DB_MAX_IDLE_CONNS", 25),
+			ConnMaxLifetime: getEnvAsDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
+			ConnMaxIdleTime: getEnvAsDuration("DB_CONN_MAX_IDLE_TIME", 5*time.Minute),
+		},
+		
+		JWT: JWTConfig{
+			Secret:               getEnv("JWT_SECRET", "default-secret-change-in-production"),
+			AccessTokenDuration:  getEnvAsDuration("JWT_ACCESS_DURATION", 15*time.Minute),
+			RefreshTokenDuration: getEnvAsDuration("JWT_REFRESH_DURATION", 7*24*time.Hour),
+		},
+		
+		Server: ServerConfig{
+			ReadTimeout:      getEnvAsDuration("SERVER_READ_TIMEOUT", 5*time.Second),
+			WriteTimeout:     getEnvAsDuration("SERVER_WRITE_TIMEOUT", 10*time.Second),
+			IdleTimeout:      getEnvAsDuration("SERVER_IDLE_TIMEOUT", time.Minute),
+			ShutdownTimeout:  getEnvAsDuration("SERVER_SHUTDOWN_TIMEOUT", 30*time.Second),
+			GracefulShutdown: getEnvAsBool("SERVER_GRACEFUL_SHUTDOWN", true),
+		},
+		
+		Timeouts: TimeoutConfig{
+			Auth:      getEnvAsDuration("TIMEOUT_AUTH", 10*time.Second),
+			UserOps:   getEnvAsDuration("TIMEOUT_USER_OPS", 15*time.Second),
+			Protected: getEnvAsDuration("TIMEOUT_PROTECTED", 8*time.Second),
+			Database:  getEnvAsDuration("TIMEOUT_DATABASE", 5*time.Second),
+		},
 	}
+
+	// Validate critical config
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	return cfg, nil
 }
 
-// Helper function to read an environment variable or return a default.
+// Validate ensures configuration values are valid
+func (c *Config) Validate() error {
+	if c.Port < 1 || c.Port > 65535 {
+		return fmt.Errorf("invalid port: %d", c.Port)
+	}
+	
+	if c.JWT.Secret == "default-secret-change-in-production" && c.Env == "production" {
+		return fmt.Errorf("default JWT secret cannot be used in production")
+	}
+	
+	if c.DB.DSN == "" {
+		return fmt.Errorf("database DSN is required")
+	}
+	
+	return nil
+}
+
+// Helper functions
 func getEnv(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists {
 		return value
@@ -42,13 +122,28 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-// Helper function to read an environment variable as an integer or return a default.
 func getEnvAsInt(key string, fallback int) int {
 	if valueStr, exists := os.LookupEnv(key); exists {
 		if value, err := strconv.Atoi(valueStr); err == nil {
-			if value > 0 && value < 65536 { // Valid port range
-				return value
-			}
+			return value
+		}
+	}
+	return fallback
+}
+
+func getEnvAsDuration(key string, fallback time.Duration) time.Duration {
+	if valueStr, exists := os.LookupEnv(key); exists {
+		if value, err := time.ParseDuration(valueStr); err == nil {
+			return value
+		}
+	}
+	return fallback
+}
+
+func getEnvAsBool(key string, fallback bool) bool {
+	if valueStr, exists := os.LookupEnv(key); exists {
+		if value, err := strconv.ParseBool(valueStr); err == nil {
+			return value
 		}
 	}
 	return fallback

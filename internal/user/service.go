@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/purushothdl/ecommerce-api/internal/models"
-	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
+	"github.com/purushothdl/ecommerce-api/pkg/errors"
 	"github.com/purushothdl/ecommerce-api/pkg/utils/crypto"
 )
 

@@ -12,7 +12,7 @@ var (
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrInvalidToken       = errors.New("invalid refresh token")
-	ErrTokenExpired       = errors.New("refresh token has expired")
+	ErrTokenExpired       = errors.New("token has expired")
 	ErrUnexpectedMethod   = errors.New("unexpected signing method")
 )
 
