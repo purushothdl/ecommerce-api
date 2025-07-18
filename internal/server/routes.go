@@ -4,6 +4,7 @@ package server
 import (
 	"github.com/go-chi/chi/v5"
 	"github.com/purushothdl/ecommerce-api/internal/auth"
+	"github.com/purushothdl/ecommerce-api/internal/shared/middleware"
 	"github.com/purushothdl/ecommerce-api/internal/user"
 )
 
@@ -20,7 +21,7 @@ func (s *Server) registerRoutes() {
 func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authHandler *auth.Handler) {
 	// Auth routes
 	r.Group(func(r chi.Router) {
-		r.Use(s.timeoutMiddleware(s.config.Timeouts.Auth))
+		r.Use(middleware.TimeoutMiddleware(s.config.Timeouts.Auth))
 		r.Post("/auth/login", authHandler.HandleLogin)
 		r.Post("/auth/refresh", authHandler.HandleRefreshToken)
 		r.Post("/auth/logout", authHandler.HandleLogout)
@@ -28,14 +29,14 @@ func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authH
 
 	// User registration routes
 	r.Group(func(r chi.Router) {
-		r.Use(s.timeoutMiddleware(s.config.Timeouts.UserOps))
+		r.Use(middleware.TimeoutMiddleware(s.config.Timeouts.UserOps))
 		r.Post("/users", userHandler.HandleRegister)
 	})
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
-		r.Use(s.authMiddleware)
-		r.Use(s.timeoutMiddleware(s.config.Timeouts.Protected))
+		r.Use(middleware.AuthMiddleware(s.config.JWT.Secret))
+		r.Use(middleware.TimeoutMiddleware(s.config.Timeouts.Protected))
 		
 		// User profile routes
 		r.Get("/users/profile", userHandler.HandleGetProfile)

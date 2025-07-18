@@ -1,4 +1,4 @@
-// internal/auth/inputs.go
+// internal/auth/requests.go
 package auth
 
 import (

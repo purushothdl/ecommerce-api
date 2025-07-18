@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/purushothdl/ecommerce-api/configs"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
+	"github.com/purushothdl/ecommerce-api/internal/shared/middleware"
 )
 
 type Server struct {
@@ -32,6 +33,10 @@ func New(
 		userService: userService,
 		authService: authService,
 	}
+	// Apply global middleware in order
+	s.router.Use(middleware.RecoveryMiddleware(logger))
+	s.router.Use(middleware.LoggingMiddleware(logger))
+	s.router.Use(middleware.CORSMiddleware())
 
 	s.registerRoutes()
 	return s

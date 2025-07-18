@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
-	usercontext "github.com/purushothdl/ecommerce-api/internal/context"
+	usercontext "github.com/purushothdl/ecommerce-api/internal/shared/context"
 	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
 	"github.com/purushothdl/ecommerce-api/pkg/response"
 	"github.com/purushothdl/ecommerce-api/pkg/validator"
