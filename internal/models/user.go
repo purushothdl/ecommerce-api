@@ -9,7 +9,7 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at"`
 	Name         string    `json:"name"`
 	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"` // Never send this in JSON responses
+	PasswordHash string    `json:"-"` 
 	Role         string    `json:"role"`
 	Version      int       `json:"version"`
 }

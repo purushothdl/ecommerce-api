@@ -8,7 +8,7 @@ import (
 )
 
 func (s *Server) registerRoutes() {
-	userHandler := user.NewHandler(s.userService)
+	userHandler := user.NewHandler(s.userService, s.authService)
 	authHandler := auth.NewHandler(s.authService, s.config.JWT.Secret)
 
 	// API versioning
@@ -36,6 +36,16 @@ func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authH
 	r.Group(func(r chi.Router) {
 		r.Use(s.authMiddleware)
 		r.Use(s.timeoutMiddleware(s.config.Timeouts.Protected))
+		
+		// User profile routes
 		r.Get("/users/profile", userHandler.HandleGetProfile)
+		r.Put("/users/profile", userHandler.HandleUpdateProfile)
+		r.Put("/users/password", userHandler.HandleChangePassword)
+		r.Delete("/users/account", userHandler.HandleDeleteAccount)
+		
+		// Session management routes
+		r.Get("/auth/sessions", authHandler.HandleGetSessions)
+		r.Delete("/auth/sessions", authHandler.HandleLogoutAllDevices)
+		r.Delete("/auth/sessions/{sessionId}", authHandler.HandleLogoutSpecificDevice)
 	})
 }

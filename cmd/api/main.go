@@ -15,6 +15,7 @@ import (
 	"github.com/purushothdl/ecommerce-api/configs"
 	"github.com/purushothdl/ecommerce-api/internal/auth"
 	"github.com/purushothdl/ecommerce-api/internal/database"
+	"github.com/purushothdl/ecommerce-api/internal/domain"
 	"github.com/purushothdl/ecommerce-api/internal/server"
 	"github.com/purushothdl/ecommerce-api/internal/user"
 )
@@ -22,8 +23,8 @@ import (
 type application struct {
 	config      *configs.Config
 	logger      *slog.Logger
-	userService user.Service
-	authService auth.Service
+	userService  domain.UserService
+	authService  domain.AuthService
 }
 
 func main() {
@@ -55,10 +56,13 @@ func run() error {
 		"max_idle_conns", cfg.DB.MaxIdleConns,
 	)
 
-	// Setup services
-	userRepo := user.NewRepository(db)
-	userService := user.NewService(userRepo)
-	authService := auth.NewService(userRepo)
+	// Setup repositories (implement domain interfaces)
+	userRepo := user.NewUserRepository(db)
+	authRepo := auth.NewAuthRepository(db)
+
+	// Setup services (implement domain interfaces)
+	userService := user.NewUserService(userRepo)
+	authService := auth.NewAuthService(userRepo, authRepo)
 
 	app := &application{
 		config:      cfg,

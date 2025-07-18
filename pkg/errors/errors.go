@@ -1,3 +1,4 @@
+//pkg/errors/errors.go
 package apperrors
 
 import "errors"
@@ -6,6 +7,7 @@ import "errors"
 var (
 	ErrUserNotFound   = errors.New("user not found")
 	ErrDuplicateEmail = errors.New("duplicate email")
+	ErrEditConflict   = errors.New("edit conflict")
 )
 
 // Auth-related errors
@@ -14,5 +16,6 @@ var (
 	ErrInvalidToken       = errors.New("invalid refresh token")
 	ErrTokenExpired       = errors.New("token has expired")
 	ErrUnexpectedMethod   = errors.New("unexpected signing method")
+	ErrSessionNotFound 	  = errors.New("session not found")
+	ErrWeakPassword       = errors.New("password too weak")
 )
-
