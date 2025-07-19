@@ -16,7 +16,7 @@ import (
 
 type userService struct {
 	userRepo domain.UserRepository
-	logger *slog.Logger
+	logger   *slog.Logger
 }
 
 // NewUserService returns a domain.UserService implementation
@@ -30,6 +30,7 @@ func NewUserService(userRepo domain.UserRepository, logger *slog.Logger) domain.
 func (s *userService) Register(ctx context.Context, name, email, password string) (*models.User, error) {
 	hashedPassword, err := crypto.HashPassword(password)
 	if err != nil {
+		s.logger.Error("failed to hash password", "error", err)
 		return nil, fmt.Errorf("user service: failed to hash password: %w", err)
 	}
 
@@ -41,6 +42,7 @@ func (s *userService) Register(ctx context.Context, name, email, password string
 	}
 
 	if err := s.userRepo.Insert(ctx, user); err != nil {
+		s.logger.Error("failed to create user", "email", email, "error", err)
 		return nil, fmt.Errorf("user service: failed to create user: %w", err)
 	}
 
@@ -50,35 +52,39 @@ func (s *userService) Register(ctx context.Context, name, email, password string
 func (s *userService) GetProfile(ctx context.Context, userID int64) (*models.User, error) {
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
+		s.logger.Error("failed to fetch user profile", "user_id", userID, "error", err)
 		return nil, fmt.Errorf("user service: failed to get user profile: %w", err)
 	}
+
 	return user, nil
 }
 
 func (s *userService) ChangePassword(ctx context.Context, userID int64, currentPassword, newPassword string) error {
-	// First, get the user to verify current password
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
+		s.logger.Error("failed to fetch user for password change", "user_id", userID, "error", err)
 		return fmt.Errorf("user service: failed to get user: %w", err)
 	}
 
-	// Verify current password
 	if err := crypto.CheckPasswordHash(currentPassword, user.PasswordHash); err != nil {
 		if errors.Is(err, crypto.ErrInvalidCredentials) {
+			s.logger.Warn("invalid current password", "user_id", userID)
 			return apperrors.ErrInvalidCredentials
 		}
+
+		s.logger.Error("failed to verify current password", "user_id", userID, "error", err)
 		return fmt.Errorf("user service: failed to verify current password: %w", err)
 	}
 
-	// Hash the new password
 	hashedNewPassword, err := crypto.HashPassword(newPassword)
 	if err != nil {
+		s.logger.Error("failed to hash new password", "user_id", userID, "error", err)
 		return fmt.Errorf("user service: failed to hash new password: %w", err)
 	}
 
-	// Update the user's password
 	user.PasswordHash = hashedNewPassword
 	if err := s.userRepo.Update(ctx, user); err != nil {
+		s.logger.Error("failed to update password", "user_id", userID, "error", err)
 		return fmt.Errorf("user service: failed to update password: %w", err)
 	}
 
@@ -86,17 +92,17 @@ func (s *userService) ChangePassword(ctx context.Context, userID int64, currentP
 }
 
 func (s *userService) UpdateProfile(ctx context.Context, userID int64, name, email *string) (*models.User, error) {
-	// Get the current user
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
+		s.logger.Error("failed to fetch user for update", "user_id", userID, "error", err)
 		return nil, fmt.Errorf("user service: failed to get user: %w", err)
 	}
 
-	// Update only the fields that are provided
 	ptr.UpdateStringIfProvided(&user.Name, name)
 	ptr.UpdateStringIfProvided(&user.Email, email)
 
 	if err := s.userRepo.Update(ctx, user); err != nil {
+		s.logger.Error("failed to update profile", "user_id", userID, "error", err)
 		return nil, fmt.Errorf("user service: failed to update profile: %w", err)
 	}
 
@@ -104,22 +110,24 @@ func (s *userService) UpdateProfile(ctx context.Context, userID int64, name, ema
 }
 
 func (s *userService) DeleteAccount(ctx context.Context, userID int64, password string) error {
-	// First, get the user to verify password
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
+		s.logger.Error("failed to fetch user for deletion", "user_id", userID, "error", err)
 		return fmt.Errorf("user service: failed to get user: %w", err)
 	}
 
-	// Verify password before deletion
 	if err := crypto.CheckPasswordHash(password, user.PasswordHash); err != nil {
 		if errors.Is(err, crypto.ErrInvalidCredentials) {
+			s.logger.Warn("invalid password for account deletion", "user_id", userID)
 			return apperrors.ErrInvalidCredentials
 		}
+
+		s.logger.Error("failed to verify password", "user_id", userID, "error", err)
 		return fmt.Errorf("user service: failed to verify password: %w", err)
 	}
 
-	// Delete the user
 	if err := s.userRepo.Delete(ctx, userID); err != nil {
+		s.logger.Error("failed to delete account", "user_id", userID, "error", err)
 		return fmt.Errorf("user service: failed to delete account: %w", err)
 	}
 

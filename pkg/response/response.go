@@ -69,7 +69,7 @@ func Created(w http.ResponseWriter, data any) {
 
 // ValidationError sends validation error response
 func ValidationError(w http.ResponseWriter, errors map[string]string) {
-	JSON(w, http.StatusUnprocessableEntity, map[string]interface{}{
+	JSON(w, http.StatusUnprocessableEntity, map[string]any{
 		"validation_errors": errors,
 	})
 }

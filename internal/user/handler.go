@@ -30,15 +30,18 @@ func NewHandler(userService domain.UserService, authService domain.AuthService, 
 }
 
 func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("register user request received")
 	var input CreateUserRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		h.logger.Warn("invalid request payload", "error", err)
 		response.Error(w, http.StatusBadRequest, "Invalid request payload")
 		return
 	}
 
 	v := validator.New()
 	if input.Validate(v); !v.Valid() {
+		h.logger.Warn("validation failed", "errors", v.Errors)
 		response.JSON(w, http.StatusUnprocessableEntity, v.Errors)
 		return
 	}
@@ -46,19 +49,24 @@ func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userService.Register(r.Context(), input.Name, input.Email, input.Password)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrDuplicateEmail) {
+			h.logger.Warn("duplicate email", "email", input.Email)
 			response.Error(w, http.StatusConflict, "Email address is already in use")
 		} else {
+			h.logger.Error("failed to register user", "error", err)
 			response.Error(w, http.StatusInternalServerError, "Could not create user")
 		}
 		return
 	}
 
 	response.JSON(w, http.StatusCreated, dto.NewUserResponse(user))
+	h.logger.Info("user registered successfully", "user_id", user.ID, "email", user.Email)
 }
 
 func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("get profile request received")
 	userCtx, err := usercontext.GetUser(r.Context())
 	if err != nil {
+		h.logger.Error("failed to retrieve user from context", "error", err)
 		response.Error(w, http.StatusInternalServerError, "error retrieving user from context")
 		return
 	}
@@ -67,32 +75,39 @@ func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userService.GetProfile(r.Context(), userCtx.ID)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrUserNotFound) {
+			h.logger.Warn("user not found", "user_id", userCtx.ID)
 			response.Error(w, http.StatusNotFound, "user not found")
 			return
 		}
+		h.logger.Error("failed to retrieve profile", "user_id", userCtx.ID, "error", err)
 		response.Error(w, http.StatusInternalServerError, "could not retrieve profile")
 		return
 	}
 
 	// Create the structured response
 	response.JSON(w, http.StatusOK, dto.NewUserResponse(user))
+	h.logger.Info("profile retrieved successfully", "user_id", user.ID)
 }
 
 func (h *Handler) HandleUpdateProfile(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("update profile request received")
 	user, err := usercontext.GetUser(r.Context())
 	if err != nil {
+		h.logger.Warn("unauthorized access", "error", err)
 		response.Error(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	var input UpdateProfileRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		h.logger.Warn("invalid request payload", "error", err)
 		response.Error(w, http.StatusBadRequest, "invalid request payload")
 		return
 	}
 
 	v := validator.New()
 	if input.Validate(v); !v.Valid() {
+		h.logger.Warn("validation failed", "errors", v.Errors)
 		response.JSON(w, http.StatusUnprocessableEntity, v.Errors)
 		return
 	}
@@ -100,35 +115,41 @@ func (h *Handler) HandleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	updatedUser, err := h.userService.UpdateProfile(r.Context(), user.ID, input.Name, input.Email)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrUserNotFound) {
+			h.logger.Warn("user not found", "user_id", user.ID)
 			response.Error(w, http.StatusNotFound, "user not found")
-			return
-		}
-		if errors.Is(err, apperrors.ErrDuplicateEmail) {
+		} else if errors.Is(err, apperrors.ErrDuplicateEmail) {
+			h.logger.Warn("duplicate email", "email", input.Email)
 			response.Error(w, http.StatusConflict, "email address is already in use")
-			return
+		} else {
+			h.logger.Error("failed to update profile", "user_id", user.ID, "error", err)
+			response.Error(w, http.StatusInternalServerError, "could not update profile")
 		}
-		response.Error(w, http.StatusInternalServerError, "could not update profile")
 		return
 	}
 
 	response.JSON(w, http.StatusOK, dto.NewUserResponse(updatedUser))
+	h.logger.Info("profile updated successfully", "user_id", user.ID)
 }
 
 func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("change password request received")
 	user, err := usercontext.GetUser(r.Context())
 	if err != nil {
+		h.logger.Warn("unauthorized access", "error", err)
 		response.Error(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	var input ChangePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		h.logger.Warn("invalid request payload", "error", err)
 		response.Error(w, http.StatusBadRequest, "invalid request payload")
 		return
 	}
 
 	v := validator.New()
 	if input.Validate(v); !v.Valid() {
+		h.logger.Warn("validation failed", "errors", v.Errors)
 		response.JSON(w, http.StatusUnprocessableEntity, v.Errors)
 		return
 	}
