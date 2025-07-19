@@ -9,6 +9,7 @@ import (
 
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	usercontext "github.com/purushothdl/ecommerce-api/internal/shared/context"
+	"github.com/purushothdl/ecommerce-api/internal/shared/dto"
 	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
 	"github.com/purushothdl/ecommerce-api/pkg/response"
 	"github.com/purushothdl/ecommerce-api/pkg/validator"
@@ -52,7 +53,7 @@ func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusCreated, NewUserResponse(user))
+	response.JSON(w, http.StatusCreated, dto.NewUserResponse(user))
 }
 
 func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
@@ -74,10 +75,7 @@ func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create the structured response
-	response.JSON(w, http.StatusOK, ProfileResponse{
-		BaseResponse: BaseResponse{Message: "Welcome to your protected profile!"},
-		UserResponse: NewUserResponse(user),
-	})
+	response.JSON(w, http.StatusOK, dto.NewUserResponse(user))
 }
 
 func (h *Handler) HandleUpdateProfile(w http.ResponseWriter, r *http.Request) {
@@ -113,10 +111,7 @@ func (h *Handler) HandleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, UpdateProfileResponse{
-		BaseResponse: BaseResponse{Message: "Profile updated successfully"},
-		UserResponse: NewUserResponse(updatedUser),
-	})
+	response.JSON(w, http.StatusOK, dto.NewUserResponse(updatedUser))
 }
 
 func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
@@ -153,9 +148,8 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("Failed to revoke all user sessions", "error", err, "userID", user.ID)
 	}
 
-	response.JSON(w, http.StatusOK, BaseResponse{
-		Message: "Password changed successfully. Please log in again.",
-	})
+	resp := response.MessageResponse{Message: "Password changed successfully. Please log in again."}
+	response.JSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
@@ -186,7 +180,6 @@ func (h *Handler) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, BaseResponse{
-		Message: "Account deleted successfully",
-	})
+	resp := response.MessageResponse{Message: "Account deleted successfully"}
+	response.JSON(w, http.StatusOK, resp)
 }

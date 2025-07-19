@@ -3,16 +3,18 @@ package domain
 
 import (
 	"context"
+
 	"github.com/purushothdl/ecommerce-api/internal/models"
 )
 
 // UserRepository handles user data operations
 type UserRepository interface {
 	Insert(ctx context.Context, user *models.User) error
-	GetByEmail(ctx context.Context, email string) (*models.User, error)
 	GetByID(ctx context.Context, id int64) (*models.User, error)
+	GetByEmail(ctx context.Context, email string) (*models.User, error)
 	Update(ctx context.Context, user *models.User) error
 	Delete(ctx context.Context, id int64) error
+	GetAll(ctx context.Context) ([]*models.User, error) 
 }
 
 // AuthRepository handles authentication data operations

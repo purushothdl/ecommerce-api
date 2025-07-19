@@ -12,26 +12,29 @@ import (
 )
 
 type Server struct {
-	config      *configs.Config
-	logger      *slog.Logger
-	router      *chi.Mux
-	userService domain.UserService
-	authService domain.AuthService
+	config       *configs.Config
+	logger       *slog.Logger
+	router       *chi.Mux
+	userService  domain.UserService
+	authService  domain.AuthService
+	adminService domain.AdminService
 }
 
 // New creates and initializes a new Server instance.
 func New(
-	config *configs.Config,
-	logger *slog.Logger,
-	userService domain.UserService,
-	authService domain.AuthService,
+	config       *configs.Config,
+	logger       *slog.Logger,
+	userService  domain.UserService,
+	authService  domain.AuthService,
+	adminService domain.AdminService,
 ) *Server {
 	s := &Server{
-		config:      config,
-		logger:      logger,
-		router:      chi.NewMux(),
-		userService: userService,
-		authService: authService,
+		config:       config,
+		logger:       logger,
+		router:       chi.NewMux(),
+		userService:  userService,
+		authService:  authService,
+		adminService: adminService,
 	}
 	// Apply global middleware in order
 	s.router.Use(middleware.RecoveryMiddleware(logger))

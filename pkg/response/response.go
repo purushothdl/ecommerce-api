@@ -23,6 +23,10 @@ type Meta struct {
 	TotalPages int `json:"total_pages,omitempty"`
 }
 
+type MessageResponse struct {
+	Message string `json:"message" example:"Operation successful"`
+}
+
 // JSON sends a JSON response
 func JSON(w http.ResponseWriter, status int, data any) {
 	response := Response{

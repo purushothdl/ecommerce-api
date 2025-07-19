@@ -13,6 +13,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/purushothdl/ecommerce-api/configs"
+	"github.com/purushothdl/ecommerce-api/internal/admin"
 	"github.com/purushothdl/ecommerce-api/internal/auth"
 	"github.com/purushothdl/ecommerce-api/internal/database"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
@@ -21,10 +22,11 @@ import (
 )
 
 type application struct {
-	config      *configs.Config
-	logger      *slog.Logger
+	config       *configs.Config
+	logger       *slog.Logger
 	userService  domain.UserService
 	authService  domain.AuthService
+	adminService domain.AdminService
 }
 
 func main() {
@@ -63,12 +65,14 @@ func run() error {
 	// Setup services (implement domain interfaces)
 	userService := user.NewUserService(userRepo, logger)
 	authService := auth.NewAuthService(userRepo, authRepo, logger)
+	adminService := admin.NewAdminService(userRepo, logger)
 
 	app := &application{
-		config:      cfg,
-		logger:      logger,
-		userService: userService,
-		authService: authService,
+		config:       cfg,
+		logger:       logger,
+		userService:  userService,
+		authService:  authService,
+		adminService: adminService,
 	}
 
 	// Start server
@@ -78,7 +82,7 @@ func run() error {
 func (app *application) startServer() error {
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", app.config.Port),
-		Handler:      server.New(app.config, app.logger, app.userService, app.authService).Router(),
+		Handler:      server.New(app.config, app.logger, app.userService, app.authService, app.adminService).Router(),
 		ReadTimeout:  app.config.Server.ReadTimeout,
 		WriteTimeout: app.config.Server.WriteTimeout,
 		IdleTimeout:  app.config.Server.IdleTimeout,

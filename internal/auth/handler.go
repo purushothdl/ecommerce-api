@@ -20,8 +20,8 @@ import (
 type Handler struct {
 	authService  domain.AuthService
 	jwtSecret    string
-	isProduction bool 
-    logger       *slog.Logger
+	isProduction bool
+	logger       *slog.Logger
 }
 
 func NewHandler(authService domain.AuthService, jwtSecret string, isProduction bool, logger *slog.Logger) *Handler {
@@ -62,10 +62,8 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	// Set refresh token as HTTP-only cookie for security
 	SetRefreshTokenCookie(w, refreshToken.Token, h.isProduction)
 
-	response.JSON(w, http.StatusOK, LoginResponse{
-		BaseResponse: BaseResponse{Message: "Login successful"},
-		AccessToken:  accessToken,
-	})
+	payload := LoginResponse{AccessToken: accessToken}
+	response.JSON(w, http.StatusOK, payload)
 }
 
 func (h *Handler) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
@@ -87,10 +85,8 @@ func (h *Handler) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, RefreshTokenResponse{
-		BaseResponse: BaseResponse{Message: "Token refreshed"},
-		AccessToken:  accessToken,
-	})
+	payload := RefreshResponse{AccessToken: accessToken}
+	response.JSON(w, http.StatusOK, payload)
 }
 
 func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
@@ -108,9 +104,8 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	// Clear the refresh token cookie
 	ClearRefreshTokenCookie(w, h.isProduction)
 
-	response.JSON(w, http.StatusOK, BaseResponse{
-		Message: "Logged out successfully",
-	})
+	resp := response.MessageResponse{Message: "Logged out successfully"}
+	response.JSON(w, http.StatusOK, resp)
 }
 
 // HandleGetSessions returns all active sessions for the authenticated user
@@ -138,11 +133,11 @@ func (h *Handler) HandleGetSessions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	response.JSON(w, http.StatusOK, GetSessionsResponse{
-		BaseResponse: BaseResponse{Message: "Sessions retrieved"},
-		Sessions:     sessionInfos,
-		Count:        len(sessionInfos),
-	})
+	payload := SessionsResponse{
+		Sessions: sessionInfos,
+		Count:    len(sessionInfos),
+	}
+	response.JSON(w, http.StatusOK, payload)
 }
 
 // HandleLogoutAllDevices logs out the user from all devices
@@ -158,9 +153,8 @@ func (h *Handler) HandleLogoutAllDevices(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	response.JSON(w, http.StatusOK, BaseResponse{
-		Message: "logged out from all devices successfully",
-	})
+	resp := response.MessageResponse{Message: "logged out from all devices successfully"}
+	response.JSON(w, http.StatusOK, resp)
 }
 
 // HandleLogoutSpecificDevice logs out from a specific device/session
@@ -187,7 +181,6 @@ func (h *Handler) HandleLogoutSpecificDevice(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	response.JSON(w, http.StatusOK, BaseResponse{
-		Message: "session revoked successfully",
-	})
+	resp := response.MessageResponse{Message: "session revoked successfully"}
+	response.JSON(w, http.StatusOK, resp)
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	"github.com/purushothdl/ecommerce-api/internal/models"
-	"github.com/purushothdl/ecommerce-api/pkg/errors"
+	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
 )
 
 type userRepository struct {
@@ -21,7 +21,6 @@ type userRepository struct {
 func NewUserRepository(db *sql.DB) domain.UserRepository {
 	return &userRepository{db: db}
 }
-
 
 func (r *userRepository) Insert(ctx context.Context, user *models.User) error {
 	query := `
@@ -128,4 +127,40 @@ func (r *userRepository) Delete(ctx context.Context, id int64) error {
 	}
 
 	return nil
+}
+
+func (r *userRepository) GetAll(ctx context.Context) ([]*models.User, error) {
+	query := `
+        SELECT id, created_at, name, email, password_hash, role, version
+        FROM users`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("user repository: failed to get all users: %w", err)
+	}
+	defer rows.Close()
+
+	users := []*models.User{}
+	for rows.Next() {
+		var user models.User
+		err := rows.Scan(
+			&user.ID,
+			&user.CreatedAt,
+			&user.Name,
+			&user.Email,
+			&user.PasswordHash,
+			&user.Role,
+			&user.Version,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("user repository: failed to scan user row: %w", err)
+		}
+		users = append(users, &user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("user repository: error iterating over rows: %w", err)
+	}
+
+	return users, nil
 }

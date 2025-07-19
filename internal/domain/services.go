@@ -26,3 +26,12 @@ type AuthService interface {
 	RevokeUserSession(ctx context.Context, userID, sessionID int64) error
 	CleanupExpiredTokens(ctx context.Context) error
 }
+
+// AdminService handles admin-specific business logic
+type AdminService interface {
+	ListUsers(ctx context.Context) ([]*models.User, error)
+	CreateUser(ctx context.Context, name, email, password string, role models.Role) (*models.User, error)
+	UpdateUser(ctx context.Context, userID int64, name, email *string, role *models.Role) (*models.User, error)
+	DeleteUser(ctx context.Context, userID int64) error
+}
+
