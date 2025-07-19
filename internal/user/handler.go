@@ -16,7 +16,7 @@ import (
 
 type Handler struct {
 	userService domain.UserService
-	authService domain.AuthService 
+	authService domain.AuthService
 	logger      *slog.Logger
 }
 
@@ -74,15 +74,12 @@ func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create the structured response
-	resp := ProfileResponse{
+	response.JSON(w, http.StatusOK, ProfileResponse{
+		BaseResponse: BaseResponse{Message: "Welcome to your protected profile!"},
 		UserResponse: NewUserResponse(user),
-		Message:      "Welcome to your protected profile!",
-	}
-
-	response.JSON(w, http.StatusOK, resp)
+	})
 }
 
-// HandleUpdateProfile allows users to update their profile information
 func (h *Handler) HandleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	user, err := usercontext.GetUser(r.Context())
 	if err != nil {
@@ -116,15 +113,12 @@ func (h *Handler) HandleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := UpdateProfileResponse{
+	response.JSON(w, http.StatusOK, UpdateProfileResponse{
+		BaseResponse: BaseResponse{Message: "Profile updated successfully"},
 		UserResponse: NewUserResponse(updatedUser),
-		Message:      "Profile updated successfully",
-	}
-
-	response.JSON(w, http.StatusOK, resp)
+	})
 }
 
-// HandleChangePassword allows users to change their password
 func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 	user, err := usercontext.GetUser(r.Context())
 	if err != nil {
@@ -156,15 +150,14 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 	// Log out from all devices after password change for security
 	if err := h.authService.RevokeAllUserSessions(r.Context(), user.ID); err != nil {
 		// Log the error but don't fail the request
-		// Password was changed successfully, session revocation is secondary
+		h.logger.Error("Failed to revoke all user sessions", "error", err, "userID", user.ID)
 	}
 
-	response.JSON(w, http.StatusOK, map[string]string{
-		"message": "password changed successfully. please log in again.",
+	response.JSON(w, http.StatusOK, BaseResponse{
+		Message: "Password changed successfully. Please log in again.",
 	})
 }
 
-// HandleDeleteAccount allows users to delete their account
 func (h *Handler) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	user, err := usercontext.GetUser(r.Context())
 	if err != nil {
@@ -193,7 +186,7 @@ func (h *Handler) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, map[string]string{
-		"message": "account deleted successfully",
+	response.JSON(w, http.StatusOK, BaseResponse{
+		Message: "Account deleted successfully",
 	})
 }

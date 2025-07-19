@@ -18,16 +18,18 @@ import (
 )
 
 type Handler struct {
-	authService domain.AuthService
-	jwtSecret   string
-	logger      *slog.Logger
+	authService  domain.AuthService
+	jwtSecret    string
+	isProduction bool 
+    logger       *slog.Logger
 }
 
-func NewHandler(authService domain.AuthService, jwtSecret string, logger *slog.Logger) *Handler {
+func NewHandler(authService domain.AuthService, jwtSecret string, isProduction bool, logger *slog.Logger) *Handler {
 	return &Handler{
-		authService: authService,
-		jwtSecret:   jwtSecret,
-		logger:      logger,
+		authService:  authService,
+		jwtSecret:    jwtSecret,
+		isProduction: isProduction,
+		logger:       logger,
 	}
 }
 
@@ -58,18 +60,11 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set refresh token as HTTP-only cookie for security
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    refreshToken.Token,
-		HttpOnly: true,
-		Secure:   false, // true in prod
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-		MaxAge:   7 * 24 * 60 * 60,
-	})
+	SetRefreshTokenCookie(w, refreshToken.Token, h.isProduction)
 
-	response.JSON(w, http.StatusOK, map[string]string{
-		"access_token": accessToken,
+	response.JSON(w, http.StatusOK, LoginResponse{
+		BaseResponse: BaseResponse{Message: "Login successful"},
+		AccessToken:  accessToken,
 	})
 }
 
@@ -92,8 +87,9 @@ func (h *Handler) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, map[string]string{
-		"access_token": accessToken,
+	response.JSON(w, http.StatusOK, RefreshTokenResponse{
+		BaseResponse: BaseResponse{Message: "Token refreshed"},
+		AccessToken:  accessToken,
 	})
 }
 
@@ -110,17 +106,11 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Clear the refresh token cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    "",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-		MaxAge:   -1,
-	})
+	ClearRefreshTokenCookie(w, h.isProduction)
 
-	response.JSON(w, http.StatusOK, map[string]string{"message": "Logged out successfully"})
+	response.JSON(w, http.StatusOK, BaseResponse{
+		Message: "Logged out successfully",
+	})
 }
 
 // HandleGetSessions returns all active sessions for the authenticated user
@@ -138,19 +128,20 @@ func (h *Handler) HandleGetSessions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to safe response format (no sensitive data)
-	sessionInfos := make([]map[string]any, len(sessions))
+	sessionInfos := make([]SessionInfo, len(sessions))
 	for i, session := range sessions {
-		sessionInfos[i] = map[string]any{
-			"id":         session.ID,
-			"created_at": session.CreatedAt,
-			"expires_at": session.ExpiresAt,
-			"is_active":  session.ExpiresAt.After(time.Now()),
+		sessionInfos[i] = SessionInfo{
+			ID:        session.ID,
+			CreatedAt: session.CreatedAt,
+			ExpiresAt: session.ExpiresAt,
+			IsActive:  session.ExpiresAt.After(time.Now()),
 		}
 	}
 
-	response.JSON(w, http.StatusOK, map[string]any{
-		"sessions": sessionInfos,
-		"count":    len(sessionInfos),
+	response.JSON(w, http.StatusOK, GetSessionsResponse{
+		BaseResponse: BaseResponse{Message: "Sessions retrieved"},
+		Sessions:     sessionInfos,
+		Count:        len(sessionInfos),
 	})
 }
 
@@ -167,8 +158,8 @@ func (h *Handler) HandleLogoutAllDevices(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	response.JSON(w, http.StatusOK, map[string]string{
-		"message": "logged out from all devices successfully",
+	response.JSON(w, http.StatusOK, BaseResponse{
+		Message: "logged out from all devices successfully",
 	})
 }
 
@@ -196,7 +187,7 @@ func (h *Handler) HandleLogoutSpecificDevice(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	response.JSON(w, http.StatusOK, map[string]string{
-		"message": "session revoked successfully",
+	response.JSON(w, http.StatusOK, BaseResponse{
+		Message: "session revoked successfully",
 	})
 }

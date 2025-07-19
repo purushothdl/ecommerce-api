@@ -9,8 +9,10 @@ import (
 )
 
 func (s *Server) registerRoutes() {
+	isProduction := s.config.Env == "production"
+
 	userHandler := user.NewHandler(s.userService, s.authService, s.logger)
-	authHandler := auth.NewHandler(s.authService, s.config.JWT.Secret, s.logger)
+	authHandler := auth.NewHandler(s.authService, s.config.JWT.Secret, isProduction, s.logger)
 
 	// API versioning
 	s.router.Route("/api/v1", func(r chi.Router) {
