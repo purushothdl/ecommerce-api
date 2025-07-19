@@ -12,9 +12,9 @@ import (
 )
 
 type Server struct {
-	config     *configs.Config
-	logger     *slog.Logger
-	router     *chi.Mux
+	config      *configs.Config
+	logger      *slog.Logger
+	router      *chi.Mux
 	userService domain.UserService
 	authService domain.AuthService
 }
@@ -36,7 +36,7 @@ func New(
 	// Apply global middleware in order
 	s.router.Use(middleware.RecoveryMiddleware(logger))
 	s.router.Use(middleware.LoggingMiddleware(logger))
-	s.router.Use(middleware.CORSMiddleware())
+	s.router.Use(middleware.CORSMiddleware(config.CORS))
 
 	s.registerRoutes()
 	return s

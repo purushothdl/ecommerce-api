@@ -4,21 +4,16 @@ package middleware
 import (
 	"net/http"
 	"strings"
+
+	"github.com/purushothdl/ecommerce-api/configs"
+
+	"slices"
 )
 
-// CORSConfig holds CORS configuration
-type CORSConfig struct {
-	AllowOrigins     []string
-	AllowMethods     []string
-	AllowHeaders     []string
-	ExposeHeaders    []string
-	AllowCredentials bool
-	MaxAge           int
-}
 
 // DefaultCORSConfig returns default CORS configuration
-func DefaultCORSConfig() CORSConfig {
-	return CORSConfig{
+func DefaultCORSConfig() configs.CORSConfig {
+	return configs.CORSConfig{
 		AllowOrigins: []string{"*"},
 		AllowMethods: []string{
 			http.MethodGet,
@@ -42,7 +37,7 @@ func DefaultCORSConfig() CORSConfig {
 }
 
 // CORSMiddleware creates CORS middleware with configuration
-func CORSMiddleware(config ...CORSConfig) func(http.Handler) http.Handler {
+func CORSMiddleware(config ...configs.CORSConfig) func(http.Handler) http.Handler {
 	cfg := DefaultCORSConfig()
 	if len(config) > 0 {
 		cfg = config[0]
@@ -57,12 +52,9 @@ func CORSMiddleware(config ...CORSConfig) func(http.Handler) http.Handler {
 				if cfg.AllowOrigins[0] == "*" {
 					w.Header().Set("Access-Control-Allow-Origin", "*")
 				} else {
-					for _, allowedOrigin := range cfg.AllowOrigins {
-						if origin == allowedOrigin {
+					if slices.Contains(cfg.AllowOrigins, origin) {
 							w.Header().Set("Access-Control-Allow-Origin", origin)
-							break
 						}
-					}
 				}
 			}
 

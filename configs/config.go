@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -17,6 +18,7 @@ type Config struct {
 	JWT      JWTConfig
 	Server   ServerConfig
 	Timeouts TimeoutConfig
+	CORS     CORSConfig
 }
 
 type DBConfig struct {
@@ -34,11 +36,11 @@ type JWTConfig struct {
 }
 
 type ServerConfig struct {
-	ReadTimeout       time.Duration
-	WriteTimeout      time.Duration
-	IdleTimeout       time.Duration
-	ShutdownTimeout   time.Duration
-	GracefulShutdown  bool
+	ReadTimeout      time.Duration
+	WriteTimeout     time.Duration
+	IdleTimeout      time.Duration
+	ShutdownTimeout  time.Duration
+	GracefulShutdown bool
 }
 
 type TimeoutConfig struct {
@@ -46,6 +48,15 @@ type TimeoutConfig struct {
 	UserOps   time.Duration
 	Protected time.Duration
 	Database  time.Duration
+}
+
+type CORSConfig struct {
+	AllowOrigins     []string
+	AllowMethods     []string
+	AllowHeaders     []string
+	ExposeHeaders    []string
+	AllowCredentials bool
+	MaxAge           int
 }
 
 func LoadConfig() (*Config, error) {
@@ -58,7 +69,7 @@ func LoadConfig() (*Config, error) {
 	cfg := &Config{
 		Env:  getEnv("ENV", "development"),
 		Port: getEnvAsInt("PORT", 8080),
-		
+
 		DB: DBConfig{
 			DSN:             getEnv("DB_DSN", "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"),
 			MaxOpenConns:    getEnvAsInt("DB_MAX_OPEN_CONNS", 25),
@@ -66,13 +77,13 @@ func LoadConfig() (*Config, error) {
 			ConnMaxLifetime: getEnvAsDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
 			ConnMaxIdleTime: getEnvAsDuration("DB_CONN_MAX_IDLE_TIME", 5*time.Minute),
 		},
-		
+
 		JWT: JWTConfig{
 			Secret:               getEnv("JWT_SECRET", "default-secret-change-in-production"),
 			AccessTokenDuration:  getEnvAsDuration("JWT_ACCESS_DURATION", 15*time.Minute),
 			RefreshTokenDuration: getEnvAsDuration("JWT_REFRESH_DURATION", 7*24*time.Hour),
 		},
-		
+
 		Server: ServerConfig{
 			ReadTimeout:      getEnvAsDuration("SERVER_READ_TIMEOUT", 5*time.Second),
 			WriteTimeout:     getEnvAsDuration("SERVER_WRITE_TIMEOUT", 10*time.Second),
@@ -80,12 +91,21 @@ func LoadConfig() (*Config, error) {
 			ShutdownTimeout:  getEnvAsDuration("SERVER_SHUTDOWN_TIMEOUT", 30*time.Second),
 			GracefulShutdown: getEnvAsBool("SERVER_GRACEFUL_SHUTDOWN", true),
 		},
-		
+
 		Timeouts: TimeoutConfig{
 			Auth:      getEnvAsDuration("TIMEOUT_AUTH", 10*time.Second),
 			UserOps:   getEnvAsDuration("TIMEOUT_USER_OPS", 15*time.Second),
 			Protected: getEnvAsDuration("TIMEOUT_PROTECTED", 8*time.Second),
 			Database:  getEnvAsDuration("TIMEOUT_DATABASE", 5*time.Second),
+		},
+
+		CORS: CORSConfig{
+			AllowOrigins:     strings.Split(getEnv("CORS_ALLOW_ORIGINS", "*"), ","),
+			AllowMethods:     strings.Split(getEnv("CORS_ALLOW_METHODS", "GET,POST,PUT,DELETE,OPTIONS,HEAD,PATCH"), ","),
+			AllowHeaders:     strings.Split(getEnv("CORS_ALLOW_HEADERS", "Accept,Authorization,Content-Type,X-CSRF-Token"), ","),
+			ExposeHeaders:    strings.Split(getEnv("CORS_EXPOSE_HEADERS", ""), ","),
+			AllowCredentials: getEnvAsBool("CORS_ALLOW_CREDENTIALS", true),
+			MaxAge:           getEnvAsInt("CORS_MAX_AGE", 86400),
 		},
 	}
 
@@ -102,15 +122,15 @@ func (c *Config) Validate() error {
 	if c.Port < 1 || c.Port > 65535 {
 		return fmt.Errorf("invalid port: %d", c.Port)
 	}
-	
+
 	if c.JWT.Secret == "default-secret-change-in-production" && c.Env == "production" {
 		return fmt.Errorf("default JWT secret cannot be used in production")
 	}
-	
+
 	if c.DB.DSN == "" {
 		return fmt.Errorf("database DSN is required")
 	}
-	
+
 	return nil
 }
 
