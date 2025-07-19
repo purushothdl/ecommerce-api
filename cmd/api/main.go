@@ -61,8 +61,8 @@ func run() error {
 	authRepo := auth.NewAuthRepository(db)
 
 	// Setup services (implement domain interfaces)
-	userService := user.NewUserService(userRepo)
-	authService := auth.NewAuthService(userRepo, authRepo)
+	userService := user.NewUserService(userRepo, logger)
+	authService := auth.NewAuthService(userRepo, authRepo, logger)
 
 	app := &application{
 		config:      cfg,

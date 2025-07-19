@@ -4,6 +4,7 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -19,12 +20,14 @@ import (
 type Handler struct {
 	authService domain.AuthService
 	jwtSecret   string
+	logger      *slog.Logger
 }
 
-func NewHandler(authService domain.AuthService, jwtSecret string) *Handler {
+func NewHandler(authService domain.AuthService, jwtSecret string, logger *slog.Logger) *Handler {
 	return &Handler{
 		authService: authService,
 		jwtSecret:   jwtSecret,
+		logger:      logger,
 	}
 }
 

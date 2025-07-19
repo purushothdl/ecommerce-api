@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/purushothdl/ecommerce-api/internal/domain"
@@ -17,54 +18,85 @@ import (
 type authService struct {
 	userRepo domain.UserRepository
 	authRepo domain.AuthRepository
+	logger *slog.Logger
 }
 
-func NewAuthService(userRepo domain.UserRepository, authRepo domain.AuthRepository) domain.AuthService {
+func NewAuthService(userRepo domain.UserRepository, authRepo domain.AuthRepository, logger *slog.Logger) domain.AuthService {
 	return &authService{
 		userRepo: userRepo,
 		authRepo: authRepo,
+		logger:   logger,
 	}
 }
 
 func (s *authService) Login(ctx context.Context, email, password string) (*models.User, *models.RefreshToken, error) {
+	s.logger.InfoContext(ctx, "attempting login", "email", email)
+
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrUserNotFound) {
+			s.logger.WarnContext(ctx, "login failed - user not found", "email", email)
 			return nil, nil, apperrors.ErrInvalidCredentials
 		}
+		s.logger.ErrorContext(ctx, "failed to get user by email", "error", err, "email", email)
 		return nil, nil, fmt.Errorf("auth service: could not process login: %w", err)
 	}
 
 	err = crypto.CheckPasswordHash(password, user.PasswordHash)
 	if err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			s.logger.WarnContext(ctx, "login failed - invalid password", "user_id", user.ID)
 			return nil, nil, apperrors.ErrInvalidCredentials
 		}
+		s.logger.ErrorContext(ctx, "failed to verify password", "error", err, "user_id", user.ID)
 		return nil, nil, fmt.Errorf("auth service: could not process login: %w", err)
 	}
 
 	const maxSessionsPerUser = 5
 	existingTokens, err := s.authRepo.GetUserRefreshTokens(ctx, user.ID)
 	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to get user refresh tokens", "error", err, "user_id", user.ID)
 		return nil, nil, fmt.Errorf("auth service: could not check existing sessions: %w", err)
 	}
 
 	if len(existingTokens) >= maxSessionsPerUser {
 		oldestToken := existingTokens[len(existingTokens)-1]
+		s.logger.InfoContext(ctx, "max sessions reached, revoking oldest token", 
+			"user_id", user.ID, 
+			"token_id", oldestToken.ID,
+		)
 		if err := s.authRepo.RevokeRefreshTokenByID(ctx, oldestToken.ID); err != nil {
+			s.logger.ErrorContext(ctx, "failed to revoke old session", 
+				"error", err, 
+				"user_id", user.ID,
+				"token_id", oldestToken.ID,
+			)
 			return nil, nil, fmt.Errorf("auth service: could not revoke old session: %w", err)
 		}
 	}
 
 	refreshToken, err := GenerateRefreshToken(user.ID)
 	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to generate refresh token", 
+			"error", err, 
+			"user_id", user.ID,
+		)
 		return nil, nil, fmt.Errorf("auth service: could not generate refresh token: %w", err)
 	}
 
 	if err := s.authRepo.StoreRefreshToken(ctx, refreshToken); err != nil {
+		s.logger.ErrorContext(ctx, "failed to store refresh token", 
+			"error", err, 
+			"user_id", user.ID,
+			"token_id", refreshToken.ID,
+		)
 		return nil, nil, fmt.Errorf("auth service: could not store refresh token: %w", err)
 	}
 
+	s.logger.InfoContext(ctx, "login successful", 
+		"user_id", user.ID, 
+		"token_id", refreshToken.ID,
+	)
 	return user, refreshToken, nil
 }
 

@@ -5,22 +5,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	"github.com/purushothdl/ecommerce-api/internal/models"
 	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
-	"github.com/purushothdl/ecommerce-api/pkg/utils/ptr"
 	"github.com/purushothdl/ecommerce-api/pkg/utils/crypto"
+	"github.com/purushothdl/ecommerce-api/pkg/utils/ptr"
 )
 
 type userService struct {
 	userRepo domain.UserRepository
+	logger *slog.Logger
 }
 
 // NewUserService returns a domain.UserService implementation
-func NewUserService(userRepo domain.UserRepository) domain.UserService {
+func NewUserService(userRepo domain.UserRepository, logger *slog.Logger) domain.UserService {
 	return &userService{
 		userRepo: userRepo,
+		logger:   logger,
 	}
 }
 

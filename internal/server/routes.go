@@ -9,8 +9,8 @@ import (
 )
 
 func (s *Server) registerRoutes() {
-	userHandler := user.NewHandler(s.userService, s.authService)
-	authHandler := auth.NewHandler(s.authService, s.config.JWT.Secret)
+	userHandler := user.NewHandler(s.userService, s.authService, s.logger)
+	authHandler := auth.NewHandler(s.authService, s.config.JWT.Secret, s.logger)
 
 	// API versioning
 	s.router.Route("/api/v1", func(r chi.Router) {

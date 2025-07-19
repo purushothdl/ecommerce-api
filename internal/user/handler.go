@@ -4,6 +4,7 @@ package user
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/purushothdl/ecommerce-api/internal/domain"
@@ -16,12 +17,14 @@ import (
 type Handler struct {
 	userService domain.UserService
 	authService domain.AuthService 
+	logger      *slog.Logger
 }
 
-func NewHandler(userService domain.UserService, authService domain.AuthService) *Handler {
+func NewHandler(userService domain.UserService, authService domain.AuthService, logger *slog.Logger) *Handler {
 	return &Handler{
 		userService: userService,
 		authService: authService,
+		logger:      logger,
 	}
 }
 
