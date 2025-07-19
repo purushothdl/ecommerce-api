@@ -49,24 +49,34 @@ func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusCreated, user)
+	response.JSON(w, http.StatusCreated, NewUserResponse(user))
 }
 
 func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
-	// Use the shared context package
 	userCtx, err := usercontext.GetUser(r.Context())
 	if err != nil {
 		response.Error(w, http.StatusInternalServerError, "error retrieving user from context")
 		return
 	}
 
-	response.JSON(w, http.StatusOK, map[string]any{
-		"message": "Welcome to your protected profile!",
-		"user_id": userCtx.ID,
-		"name":    userCtx.Name,
-		"email":   userCtx.Email,
-		"role":    userCtx.Role,
-	})
+	// Fetch the full user model
+	user, err := h.userService.GetProfile(r.Context(), userCtx.ID)
+	if err != nil {
+		if errors.Is(err, apperrors.ErrUserNotFound) {
+			response.Error(w, http.StatusNotFound, "user not found")
+			return
+		}
+		response.Error(w, http.StatusInternalServerError, "could not retrieve profile")
+		return
+	}
+
+	// Create the structured response
+	resp := ProfileResponse{
+		UserResponse: NewUserResponse(user),
+		Message:      "Welcome to your protected profile!",
+	}
+
+	response.JSON(w, http.StatusOK, resp)
 }
 
 // HandleUpdateProfile allows users to update their profile information
@@ -103,7 +113,12 @@ func (h *Handler) HandleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, updatedUser)
+	resp := UpdateProfileResponse{
+		UserResponse: NewUserResponse(updatedUser),
+		Message:      "Profile updated successfully",
+	}
+
+	response.JSON(w, http.StatusOK, resp)
 }
 
 // HandleChangePassword allows users to change their password

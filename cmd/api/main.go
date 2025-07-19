@@ -36,7 +36,7 @@ func main() {
 
 func run() error {
 	// Initialize logger
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil)) // change to json in prod
 	
 	// Load configuration
 	cfg, err := configs.LoadConfig()

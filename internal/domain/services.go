@@ -3,6 +3,7 @@ package domain
 
 import (
 	"context"
+
 	"github.com/purushothdl/ecommerce-api/internal/models"
 )
 
@@ -10,7 +11,7 @@ import (
 type UserService interface {
 	Register(ctx context.Context, name, email, password string) (*models.User, error)
 	GetProfile(ctx context.Context, userID int64) (*models.User, error)
-	UpdateProfile(ctx context.Context, userID int64, name, email string) (*models.User, error)
+	UpdateProfile(ctx context.Context, userID int64, name, email *string) (*models.User, error) 
 	ChangePassword(ctx context.Context, userID int64, currentPassword, newPassword string) error
 	DeleteAccount(ctx context.Context, userID int64, password string) error
 }

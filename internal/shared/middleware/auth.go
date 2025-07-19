@@ -51,3 +51,23 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 		})
 	}
 }
+
+func AdminMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Get user from context (populated by AuthMiddleware)
+		user, err := usercontext.GetUser(r.Context())
+		if err != nil {
+			response.Error(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+
+		// Check if the user role is 'admin'
+		if user.Role != "admin" {
+			response.Error(w, http.StatusForbidden, "access forbidden: admin rights required")
+			return
+		}
+
+		// If user is an admin, proceed to the next handler
+		next.ServeHTTP(w, r)
+	})
+}

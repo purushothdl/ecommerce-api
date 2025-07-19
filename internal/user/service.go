@@ -9,8 +9,8 @@ import (
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	"github.com/purushothdl/ecommerce-api/internal/models"
 	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
+	"github.com/purushothdl/ecommerce-api/pkg/utils/ptr"
 	"github.com/purushothdl/ecommerce-api/pkg/utils/crypto"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type userService struct {
@@ -61,7 +61,7 @@ func (s *userService) ChangePassword(ctx context.Context, userID int64, currentP
 
 	// Verify current password
 	if err := crypto.CheckPasswordHash(currentPassword, user.PasswordHash); err != nil {
-		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+		if errors.Is(err, crypto.ErrInvalidCredentials) {
 			return apperrors.ErrInvalidCredentials
 		}
 		return fmt.Errorf("user service: failed to verify current password: %w", err)
@@ -82,18 +82,17 @@ func (s *userService) ChangePassword(ctx context.Context, userID int64, currentP
 	return nil
 }
 
-func (s *userService) UpdateProfile(ctx context.Context, userID int64, name, email string) (*models.User, error) {
+func (s *userService) UpdateProfile(ctx context.Context, userID int64, name, email *string) (*models.User, error) {
 	// Get the current user
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("user service: failed to get user: %w", err)
 	}
 
-	// Update the fields
-	user.Name = name
-	user.Email = email
+	// Update only the fields that are provided
+	ptr.UpdateStringIfProvided(&user.Name, name)
+	ptr.UpdateStringIfProvided(&user.Email, email)
 
-	// Save the updated user
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, fmt.Errorf("user service: failed to update profile: %w", err)
 	}
@@ -110,7 +109,7 @@ func (s *userService) DeleteAccount(ctx context.Context, userID int64, password 
 
 	// Verify password before deletion
 	if err := crypto.CheckPasswordHash(password, user.PasswordHash); err != nil {
-		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+		if errors.Is(err, crypto.ErrInvalidCredentials) {
 			return apperrors.ErrInvalidCredentials
 		}
 		return fmt.Errorf("user service: failed to verify password: %w", err)

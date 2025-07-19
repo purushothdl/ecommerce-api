@@ -14,10 +14,10 @@ func (r CreateUserRequest) Validate(v *validator.Validator) {
 	v.Check(validator.NotBlank(r.Name), "name", "must be provided")
 	v.Check(len(r.Name) >= 2, "name", "must be at least 2 characters long")
 	v.Check(len(r.Name) <= 100, "name", "must not exceed 100 characters")
-	
+
 	v.Check(validator.NotBlank(r.Email), "email", "must be provided")
 	v.Check(validator.Matches(r.Email, validator.EmailRX), "email", "must be a valid email address")
-	
+
 	v.Check(validator.NotBlank(r.Password), "password", "must be provided")
 	v.Check(len(r.Password) >= 8, "password", "must be at least 8 characters long")
 	v.Check(len(r.Password) <= 72, "password", "must not exceed 72 characters")
@@ -25,17 +25,24 @@ func (r CreateUserRequest) Validate(v *validator.Validator) {
 
 // UpdateProfileRequest represents profile update request
 type UpdateProfileRequest struct {
-	Name  string `json:"name" example:"John Doe"`
-	Email string `json:"email" example:"john@example.com"`
+	Name  *string `json:"name" example:"John Doe"`
+	Email *string `json:"email" example:"john@example.com"`
 }
 
 func (r UpdateProfileRequest) Validate(v *validator.Validator) {
-	v.Check(validator.NotBlank(r.Name), "name", "must be provided")
-	v.Check(len(r.Name) >= 2, "name", "must be at least 2 characters long")
-	v.Check(len(r.Name) <= 100, "name", "must not exceed 100 characters")
-	
-	v.Check(validator.NotBlank(r.Email), "email", "must be provided")
-	v.Check(validator.Matches(r.Email, validator.EmailRX), "email", "must be a valid email address")
+	// Name is optional, but if provided, it must meet the requirements
+	if r.Name != nil {
+		v.Check(len(*r.Name) >= 2, "name", "must be at least 2 characters long")
+		v.Check(len(*r.Name) <= 100, "name", "must not exceed 100 characters")
+	}
+
+	// Email is optional, but if provided, it must be a valid email
+	if r.Email != nil {
+		v.Check(validator.Matches(*r.Email, validator.EmailRX), "email", "must be a valid email address")
+	}
+
+	// Ensure at least one field is provided
+	v.Check(r.Name != nil || r.Email != nil, "", "at least one field (name or email) must be provided")
 }
 
 // ChangePasswordRequest represents password change request

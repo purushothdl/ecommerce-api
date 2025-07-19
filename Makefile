@@ -1,5 +1,5 @@
 # Makefile
-.PHONY: migrateup migratedown run
+.PHONY: migrateup migratedown run hashtest seed
 
 # Load environment variables from .env file
 include .env
@@ -23,3 +23,7 @@ run:
 hashtest:
 	@echo "Running hash test..."
 	go run ./hashtest/main.go
+
+seed:
+	@echo "Seeding database with admin user..."
+	@go run ./cmd/seed/main.go
