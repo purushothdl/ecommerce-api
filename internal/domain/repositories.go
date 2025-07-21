@@ -28,3 +28,33 @@ type AuthRepository interface {
 	RevokeUserSessionByID(ctx context.Context, userID, sessionID int64) error
 	CleanupExpiredTokens(ctx context.Context) error
 }
+
+// ProductRepository handles product data operations
+type ProductRepository interface {
+	Create(ctx context.Context, product *models.Product) error
+	GetAll(ctx context.Context, filters ProductFilters) ([]*models.Product, error)
+	GetByID(ctx context.Context, id int64) (*models.Product, error)
+}
+
+// CategoryRepository handles category data operations
+type CategoryRepository interface {
+	GetByName(ctx context.Context, name string) (*models.Category, error)
+	GetAll(ctx context.Context) ([]*models.Category, error)
+	Create(ctx context.Context, category *models.Category) error
+}
+
+// CartRepository handles shopping cart data operations
+type CartRepository interface {
+    // Cart methods
+    GetByUserID(ctx context.Context, userID int64) (*models.Cart, error)
+    GetByID(ctx context.Context, cartID int64) (*models.Cart, error)
+    Create(ctx context.Context, userID *int64) (*models.Cart, error)
+    MergeCarts(ctx context.Context, fromCartID, toCartID int64) error
+	Delete(ctx context.Context, cartID int64) error
+
+    // CartItem methods
+    AddItem(ctx context.Context, cartID int64, productID int64, quantity int) error
+    UpdateItemQuantity(ctx context.Context, cartID int64, productID int64, quantity int) error
+    RemoveItem(ctx context.Context, cartID int64, productID int64) error
+	GetItemsByCartID(ctx context.Context, cartID int64) ([]models.CartItem, error)
+}

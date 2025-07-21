@@ -14,19 +14,28 @@ import (
 	usercontext "github.com/purushothdl/ecommerce-api/internal/shared/context"
 	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
 	"github.com/purushothdl/ecommerce-api/pkg/response"
+	"github.com/purushothdl/ecommerce-api/pkg/web"
 	"github.com/purushothdl/ecommerce-api/pkg/validator"
 )
 
 type Handler struct {
 	authService  domain.AuthService
+	cartService  domain.CartService
 	jwtSecret    string
 	isProduction bool
 	logger       *slog.Logger
 }
 
-func NewHandler(authService domain.AuthService, jwtSecret string, isProduction bool, logger *slog.Logger) *Handler {
+func NewHandler(
+	authService  domain.AuthService, 
+	cartService  domain.CartService, 
+	jwtSecret    string, 
+	isProduction bool, 
+	logger       *slog.Logger,
+) *Handler {
 	return &Handler{
 		authService:  authService,
+		cartService:  cartService,
 		jwtSecret:    jwtSecret,
 		isProduction: isProduction,
 		logger:       logger,
@@ -65,8 +74,44 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+    // ====================================================================
+	// NEW: CART MERGE LOGIC STARTS HERE
+	// ====================================================================
+
+	// 1. Read the anonymous cart ID from the cookie
+	var anonymousCartID int64
+	cookie, err := r.Cookie(web.CartIDCookieName)
+	if err == nil {
+		// If cookie exists, parse its value
+		id, parseErr := strconv.ParseInt(cookie.Value, 10, 64)
+		if parseErr == nil {
+			anonymousCartID = id
+		} else {
+            h.logger.Warn("failed to parse cart_id cookie during login", "cookie_value", cookie.Value, "error", parseErr)
+        }
+	}
+
+	// 2. Call the cart service to handle the merge.
+    // The service contains the business logic to prevent errors, e.g., if no anonymous cart exists.
+    if anonymousCartID != 0 {
+	    err = h.cartService.HandleLogin(r.Context(), user.ID, anonymousCartID)
+	    if err != nil {
+		    // Log the error but don't fail the login. The user is authenticated,
+		    // but their old cart couldn't be merged. This is better than failing the login entirely.
+		    h.logger.Error("failed to merge carts on login", "user_id", user.ID, "anonymous_cart_id", anonymousCartID, "error", err)
+	    } else {
+            // 3. If merge was successful, clear the old anonymous cart cookie.
+            web.ClearCookie(w, web.CartIDCookieName, h.isProduction)
+        }
+    }
+
+	// ====================================================================
+	// CART MERGE LOGIC ENDS HERE
+	// ====================================================================
+
+
 	// Set refresh token as HTTP-only cookie for security
-	SetRefreshTokenCookie(w, refreshToken.Token, h.isProduction)
+	web.SetRefreshTokenCookie(w, refreshToken.Token, h.isProduction)
 
 	payload := LoginResponse{
 		AccessToken: accessToken,
@@ -74,7 +119,6 @@ func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusOK, payload)
 
 	h.logger.Info("user logged in successfully", "user_id", user.ID)
-
 }
 
 // HandleRefreshToken handles requests to refresh an access token using a valid refresh token
@@ -125,8 +169,8 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ClearRefreshTokenCookie(w, h.isProduction)
-	
+	web.ClearCookie(w, web.RefreshTokenCookieName, h.isProduction)
+
 	resp := response.MessageResponse{Message: "Logged out successfully"}
 	response.JSON(w, http.StatusOK, resp)
 	

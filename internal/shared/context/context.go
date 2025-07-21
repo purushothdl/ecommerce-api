@@ -10,9 +10,10 @@ type contextKey string
 
 const (
 	UserContextKey contextKey = "user"
+	CartContextKey contextKey = "cart"
 )
 
-// UserContext represents the authenticated user in request context
+// UserContext represents the authenticated user in request context.
 type UserContext struct {
 	ID    int64  `json:"id"`
 	Name  string `json:"name"`
@@ -20,12 +21,16 @@ type UserContext struct {
 	Role  string `json:"role"`
 }
 
-// SetUser adds user to context
+type CartContext struct {
+	ID int64 `json:"id"`
+}
+
+// SetUser adds a user to the context.
 func SetUser(ctx context.Context, user UserContext) context.Context {
 	return context.WithValue(ctx, UserContextKey, user)
 }
 
-// GetUser retrieves user from context
+// GetUser retrieves the user from the context.
 func GetUser(ctx context.Context) (UserContext, error) {
 	user, ok := ctx.Value(UserContextKey).(UserContext)
 	if !ok {
@@ -34,11 +39,25 @@ func GetUser(ctx context.Context) (UserContext, error) {
 	return user, nil
 }
 
-// GetUserID is a convenience method to get just the user ID
+// GetUserID retrieves just the user ID from the context.
 func GetUserID(ctx context.Context) (int64, error) {
 	user, err := GetUser(ctx)
 	if err != nil {
 		return 0, err
 	}
 	return user.ID, nil
+}
+
+// SetCart adds a cart to the context.
+func SetCart(ctx context.Context, cart interface{}) context.Context {
+	return context.WithValue(ctx, CartContextKey, cart)
+}
+
+// GetCart retrieves the cart from the context.
+func GetCart(ctx context.Context) (CartContext, error) {
+	cart, ok := ctx.Value(CartContextKey).(CartContext)
+	if !ok {
+		return CartContext{}, errors.New("cart not found in context")
+	}
+	return cart, nil
 }

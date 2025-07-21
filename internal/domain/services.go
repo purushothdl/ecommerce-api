@@ -35,3 +35,24 @@ type AdminService interface {
 	DeleteUser(ctx context.Context, userID int64) error
 }
 
+// ProductService handles product business logic
+type ProductService interface {
+	ListProducts(ctx context.Context, filters ProductFilters) ([]*models.Product, error)
+	GetProduct(ctx context.Context, id int64) (*models.Product, error)
+}
+
+// CategoryService handles category business logic
+type CategoryService interface {
+	ListCategories(ctx context.Context) ([]*models.Category, error)
+	GetOrCreate(ctx context.Context, name string) (*models.Category, error)
+}
+
+// CartService handles shopping cart operations
+type CartService interface {
+    GetOrCreateCart(ctx context.Context, userID *int64, anonymousCartID *int64) (*models.Cart, error)
+    AddProductToCart(ctx context.Context, cartID int64, productID int64, quantity int) (*models.Cart, error)
+    UpdateProductInCart(ctx context.Context, cartID int64, productID int64, quantity int) (*models.Cart, error)
+    RemoveProductFromCart(ctx context.Context, cartID int64, productID int64) (*models.Cart, error)
+    GetCartContents(ctx context.Context, cartID int64) (*models.Cart, error)
+    HandleLogin(ctx context.Context, userID int64, anonymousCartID int64) error
+}

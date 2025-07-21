@@ -44,8 +44,6 @@ func AuthMiddleware(jwtSecret string) func(http.Handler) http.Handler {
 				Email: claims["email"].(string),
 				Role:  claims["role"].(string),
 			}
-
-			// Add user to request context
 			ctx := usercontext.SetUser(r.Context(), user)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

@@ -15,6 +15,9 @@ import (
 	"github.com/purushothdl/ecommerce-api/configs"
 	"github.com/purushothdl/ecommerce-api/internal/admin"
 	"github.com/purushothdl/ecommerce-api/internal/auth"
+	"github.com/purushothdl/ecommerce-api/internal/cart"
+	"github.com/purushothdl/ecommerce-api/internal/category"
+	"github.com/purushothdl/ecommerce-api/internal/product"
 	"github.com/purushothdl/ecommerce-api/internal/database"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	"github.com/purushothdl/ecommerce-api/internal/server"
@@ -22,11 +25,14 @@ import (
 )
 
 type application struct {
-	config       *configs.Config
-	logger       *slog.Logger
-	userService  domain.UserService
-	authService  domain.AuthService
-	adminService domain.AdminService
+	config          *configs.Config
+	logger          *slog.Logger
+	userService     domain.UserService
+	authService     domain.AuthService
+	adminService    domain.AdminService
+	productService  domain.ProductService
+	categoryService domain.CategoryService
+	cartService     domain.CartService
 }
 
 func main() {
@@ -38,7 +44,7 @@ func main() {
 
 func run() error {
 	// Initialize logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil)) // change to json in prod
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil)) 
 	
 	// Load configuration
 	cfg, err := configs.LoadConfig()
@@ -61,18 +67,27 @@ func run() error {
 	// Setup repositories (implement domain interfaces)
 	userRepo := user.NewUserRepository(db)
 	authRepo := auth.NewAuthRepository(db)
+	categoryRepo := category.NewCategoryRepository(db)
+	productRepo := product.NewProductRepository(db)
+	cartRepo := cart.NewCartRepository(db)
 
 	// Setup services (implement domain interfaces)
 	userService := user.NewUserService(userRepo, logger)
 	authService := auth.NewAuthService(userRepo, authRepo, logger)
 	adminService := admin.NewAdminService(userRepo, logger)
+	categoryService := category.NewCategoryService(categoryRepo, logger)
+	productService := product.NewProductService(productRepo, logger)
+	cartService := cart.NewCartService(cartRepo, productRepo, logger)
 
 	app := &application{
-		config:       cfg,
-		logger:       logger,
-		userService:  userService,
-		authService:  authService,
-		adminService: adminService,
+		config:          cfg,
+		logger:          logger,
+		userService:     userService,
+		authService:     authService,
+		adminService:    adminService,
+		productService:  productService,
+		categoryService: categoryService,
+		cartService:     cartService,
 	}
 
 	// Start server
@@ -82,7 +97,11 @@ func run() error {
 func (app *application) startServer() error {
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", app.config.Port),
-		Handler:      server.New(app.config, app.logger, app.userService, app.authService, app.adminService).Router(),
+		Handler: server.New(
+			app.config, app.logger, app.userService, app.authService,
+			app.adminService, app.productService, app.categoryService,
+			app.cartService,
+		).Router(),
 		ReadTimeout:  app.config.Server.ReadTimeout,
 		WriteTimeout: app.config.Server.WriteTimeout,
 		IdleTimeout:  app.config.Server.IdleTimeout,
@@ -130,4 +149,3 @@ func (app *application) handleShutdown(srv *http.Server, shutdownComplete chan s
 		app.logger.Error("forced server shutdown", "error", err)
 	}
 }
-

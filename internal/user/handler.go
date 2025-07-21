@@ -174,33 +174,41 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
+	h.logger.Info("delete account request received")
 	user, err := usercontext.GetUser(r.Context())
 	if err != nil {
+		h.logger.Warn("unauthorized access", "error", err)
 		response.Error(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 
 	var input DeleteAccountRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		h.logger.Warn("invalid request payload", "error", err)
 		response.Error(w, http.StatusBadRequest, "invalid request payload")
 		return
 	}
 
 	v := validator.New()
 	if input.Validate(v); !v.Valid() {
+		h.logger.Warn("validation failed", "errors", v.Errors)
 		response.JSON(w, http.StatusUnprocessableEntity, v.Errors)
 		return
 	}
 
 	if err := h.userService.DeleteAccount(r.Context(), user.ID, input.Password); err != nil {
 		if errors.Is(err, apperrors.ErrInvalidCredentials) {
+			h.logger.Warn("invalid password for account deletion", "user_id", user.ID)
 			response.Error(w, http.StatusUnauthorized, "password is incorrect")
 			return
 		}
+		h.logger.Error("failed to delete account", "user_id", user.ID, "error", err)
 		response.Error(w, http.StatusInternalServerError, "could not delete account")
 		return
 	}
 
+	h.logger.Info("account deleted successfully", "user_id", user.ID)
+	
 	resp := response.MessageResponse{Message: "Account deleted successfully"}
 	response.JSON(w, http.StatusOK, resp)
 }

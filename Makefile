@@ -25,5 +25,5 @@ hashtest:
 	go run ./hashtest/main.go
 
 seed:
-	@echo "Seeding database with admin user..."
-	@go run ./cmd/seed/main.go
+	@echo "Seeding database..."
+	@go run ./cmd/seed/

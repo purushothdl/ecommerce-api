@@ -3,6 +3,12 @@ package apperrors
 
 import "errors"
 
+// Common errors
+var (
+	ErrNotFound = errors.New("not found")
+	ErrInsufficientStock = errors.New("insufficient stock")
+)
+
 // User-related errors
 var (
 	ErrUserNotFound   = errors.New("user not found")
