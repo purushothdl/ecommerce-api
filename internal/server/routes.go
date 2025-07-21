@@ -12,7 +12,7 @@ import (
 )
 
 func (s *Server) registerRoutes() {
-	userHandler := user.NewHandler(s.userService, s.authService, s.logger)
+	userHandler := user.NewHandler(s.userService, s.authService, s.cartService, s.config.JWT.Secret, s.isProduction, s.logger)
 	authHandler := auth.NewHandler(s.authService, s.cartService, s.config.JWT.Secret, s.isProduction, s.logger)
 	adminHandler := admin.NewHandler(s.adminService, s.logger)
 	productHandler := product.NewHandler(s.productService, s.categoryService, s.logger)
@@ -78,6 +78,7 @@ func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authH
 
 	// Cart routes with cart middleware for session/user cart management
 	r.Group(func(r chi.Router) {
+		r.Use(middleware.OptionalAuthMiddleware(s.config.JWT.Secret)) 
         r.Use(middleware.CartMiddleware(s.cartService, s.isProduction))
         
         r.Get("/cart", cartHandler.HandleGetCart)

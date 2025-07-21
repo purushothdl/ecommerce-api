@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/purushothdl/ecommerce-api/internal/domain"
-	usercontext "github.com/purushothdl/ecommerce-api/internal/shared/context"
+	"github.com/purushothdl/ecommerce-api/internal/shared/context"
 	"github.com/purushothdl/ecommerce-api/pkg/response"
 	"github.com/purushothdl/ecommerce-api/pkg/web"
 )
@@ -17,7 +17,7 @@ func CartMiddleware(cartSvc domain.CartService, isProduction bool) func(http.Han
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Get user ID if authenticated
 			var userID *int64
-			if user, err := usercontext.GetUser(r.Context()); err == nil {
+			if user, err := context.GetUser(r.Context()); err == nil {
 				userID = &user.ID
 			}
 
@@ -42,7 +42,9 @@ func CartMiddleware(cartSvc domain.CartService, isProduction bool) func(http.Han
 			}
 
 			// Inject cart into context
-			ctx := usercontext.SetCart(r.Context(), cart)
+			ctx := context.SetCart(r.Context(), context.CartContext{
+				ID:     cart.ID,
+			})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	usercontext "github.com/purushothdl/ecommerce-api/internal/shared/context"
@@ -13,19 +14,26 @@ import (
 	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
 	"github.com/purushothdl/ecommerce-api/pkg/response"
 	"github.com/purushothdl/ecommerce-api/pkg/validator"
+	"github.com/purushothdl/ecommerce-api/pkg/web"
 )
 
 type Handler struct {
-	userService domain.UserService
-	authService domain.AuthService
-	logger      *slog.Logger
+	userService  domain.UserService
+	authService  domain.AuthService
+	cartService  domain.CartService
+	jwtSecret    string
+	isProduction bool
+	logger       *slog.Logger
 }
 
-func NewHandler(userService domain.UserService, authService domain.AuthService, logger *slog.Logger) *Handler {
+func NewHandler(userService domain.UserService, authService domain.AuthService, cartService domain.CartService, jwtSecret string, isProduction bool, logger *slog.Logger) *Handler {
 	return &Handler{
-		userService: userService,
-		authService: authService,
-		logger:      logger,
+		userService:  userService,
+		authService:  authService,
+		cartService:  cartService,
+		jwtSecret:    jwtSecret,
+		isProduction: isProduction,
+		logger:       logger,
 	}
 }
 
@@ -46,6 +54,7 @@ func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create user account
 	user, err := h.userService.Register(r.Context(), input.Name, input.Email, input.Password)
 	if err != nil {
 		if errors.Is(err, apperrors.ErrDuplicateEmail) {
@@ -58,8 +67,49 @@ func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusCreated, dto.NewUserResponse(user))
-	h.logger.Info("user registered successfully", "user_id", user.ID, "email", user.Email)
+	// Merge anonymous cart if exists
+	var anonymousCartID int64
+	if cookie, err := r.Cookie(web.CartIDCookieName); err == nil {
+		if id, parseErr := strconv.ParseInt(cookie.Value, 10, 64); parseErr == nil {
+			anonymousCartID = id
+		} else {
+			h.logger.Warn("failed to parse cart_id cookie", "cookie_value", cookie.Value, "error", parseErr)
+		}
+	}
+
+	if anonymousCartID != 0 {
+		if err := h.cartService.HandleLogin(r.Context(), user.ID, anonymousCartID); err != nil {
+			h.logger.Error("failed to merge cart", "user_id", user.ID, "anonymous_cart_id", anonymousCartID, "error", err)
+		} else {
+			web.ClearCookie(w, web.CartIDCookieName, h.isProduction)
+			h.logger.Info("successfully merged cart", "user_id", user.ID, "anonymous_cart_id", anonymousCartID)
+		}
+	}
+
+	// Auto-login after registration
+	refreshToken, err := h.authService.GenerateRefreshToken(r.Context(), user.ID)
+	if err != nil {
+		h.logger.Error("failed to create refresh token", "user_id", user.ID, "error", err)
+		response.JSON(w, http.StatusCreated, dto.NewUserResponse(user))
+		return
+	}
+
+	accessToken, err := h.authService.GenerateAccessToken(r.Context(), user)
+	if err != nil {
+		h.logger.Error("failed to generate access token", "user_id", user.ID, "error", err)
+		response.JSON(w, http.StatusCreated, dto.NewUserResponse(user))
+		return
+	}
+
+	web.SetRefreshTokenCookie(w, refreshToken.Token, h.isProduction)
+
+	payload := LoginResponse{
+		User:        dto.NewUserResponse(user),
+		AccessToken: accessToken,
+	}
+
+	response.JSON(w, http.StatusCreated, payload)
+	h.logger.Info("user registered and logged in", "user_id", user.ID, "email", user.Email)
 }
 
 func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {
@@ -208,7 +258,7 @@ func (h *Handler) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info("account deleted successfully", "user_id", user.ID)
-	
+
 	resp := response.MessageResponse{Message: "Account deleted successfully"}
 	response.JSON(w, http.StatusOK, resp)
 }

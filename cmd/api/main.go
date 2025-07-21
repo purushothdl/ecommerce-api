@@ -73,7 +73,7 @@ func run() error {
 
 	// Setup services (implement domain interfaces)
 	userService := user.NewUserService(userRepo, logger)
-	authService := auth.NewAuthService(userRepo, authRepo, logger)
+	authService := auth.NewAuthService(authRepo, userRepo, cfg.JWT.Secret, logger)
 	adminService := admin.NewAdminService(userRepo, logger)
 	categoryService := category.NewCategoryService(categoryRepo, logger)
 	productService := product.NewProductService(productRepo, logger)

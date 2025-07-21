@@ -148,12 +148,13 @@ func (h *Handler) HandleRemoveItem(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("request to remove item from cart", "cart_id", cart.ID, "product_id", productID)
 
-	updatedCart, err := h.cartSvc.RemoveProductFromCart(r.Context(), cart.ID, productID)
+	_, err = h.cartSvc.RemoveProductFromCart(r.Context(), cart.ID, productID)
 	if err != nil {
 		h.logger.Error("unhandled error removing item from cart", "error", err)
 		response.Error(w, http.StatusInternalServerError, "could not remove item from cart")
 		return
 	}
 
-	response.JSON(w, http.StatusOK, updatedCart)
+	resp := response.MessageResponse{Message: "item removed successfully"}
+	response.JSON(w, http.StatusOK, resp)
 }

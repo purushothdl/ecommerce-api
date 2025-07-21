@@ -4,6 +4,7 @@ package domain
 import (
 	"context"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/purushothdl/ecommerce-api/internal/models"
 )
 
@@ -25,6 +26,9 @@ type AuthService interface {
 	RevokeAllUserSessions(ctx context.Context, userID int64) error
 	RevokeUserSession(ctx context.Context, userID, sessionID int64) error
 	CleanupExpiredTokens(ctx context.Context) error
+	GenerateAccessToken(ctx context.Context, user *models.User) (string, error)
+	GenerateRefreshToken(ctx context.Context, userID int64) (*models.RefreshToken, error)
+    ValidateToken(ctx context.Context, tokenString string) (jwt.MapClaims, error) 
 }
 
 // AdminService handles admin-specific business logic

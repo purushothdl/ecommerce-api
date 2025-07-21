@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	"github.com/purushothdl/ecommerce-api/internal/models"
 	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
@@ -16,16 +17,18 @@ import (
 )
 
 type authService struct {
-	userRepo domain.UserRepository
-	authRepo domain.AuthRepository
-	logger   *slog.Logger
+	userRepo  domain.UserRepository
+	authRepo  domain.AuthRepository
+	jwtSecret string
+	logger    *slog.Logger
 }
 
-func NewAuthService(userRepo domain.UserRepository, authRepo domain.AuthRepository, logger *slog.Logger) domain.AuthService {
+func NewAuthService(authRepo domain.AuthRepository, userRepo domain.UserRepository, jwtSecret string, logger *slog.Logger) domain.AuthService {
 	return &authService{
-		userRepo: userRepo,
-		authRepo: authRepo,
-		logger:   logger,
+		authRepo:  authRepo,
+		userRepo:  userRepo,
+		jwtSecret: jwtSecret,
+		logger:    logger,
 	}
 }
 
@@ -58,18 +61,18 @@ func (s *authService) Login(ctx context.Context, email, password string) (*model
 	if len(existingTokens) >= maxSessionsPerUser {
 		oldestToken := existingTokens[len(existingTokens)-1]
 		s.logger.Info(
-			"max sessions reached, revoking oldest token", 
-			"user_id", user.ID, 
+			"max sessions reached, revoking oldest token",
+			"user_id", user.ID,
 			"revoked_token_id", oldestToken.ID,
 		)
-		
+
 		if err := s.authRepo.RevokeRefreshTokenByID(ctx, oldestToken.ID); err != nil {
 			s.logger.Error("failed to revoke old session", "user_id", user.ID, "error", err)
 			return nil, nil, fmt.Errorf("auth service: could not revoke old session: %w", err)
 		}
 	}
 
-	refreshToken, err := GenerateRefreshToken(user.ID)
+	refreshToken, err := s.GenerateRefreshToken(ctx, user.ID)
 	if err != nil {
 		s.logger.Error("failed to generate refresh token", "user_id", user.ID, "error", err)
 		return nil, nil, fmt.Errorf("auth service: could not generate refresh token: %w", err)
@@ -164,4 +167,25 @@ func (s *authService) CleanupExpiredTokens(ctx context.Context) error {
 		return fmt.Errorf("auth service: could not cleanup expired tokens: %w", err)
 	}
 	return nil
+}
+
+func (s *authService) GenerateAccessToken(ctx context.Context, user *models.User) (string, error) {
+	return GenerateAccessToken(user, s.jwtSecret)
+}
+
+func (s *authService) ValidateToken(ctx context.Context, tokenString string) (jwt.MapClaims, error) {
+	return ValidateToken(tokenString, s.jwtSecret)
+}
+
+func (s *authService) GenerateRefreshToken(ctx context.Context, userID int64) (*models.RefreshToken, error) {
+	token, err := GenerateRefreshToken(userID)
+	if err != nil {
+		s.logger.Error(
+			"failed to generate refresh token",
+			"user_id", userID,
+			"error", err,
+		)
+		return nil, fmt.Errorf("auth service: %w", err)
+	}
+	return token, nil
 }

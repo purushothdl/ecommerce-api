@@ -125,6 +125,7 @@ func (s *cartService) UpdateProductInCart(ctx context.Context, cartID int64, pro
 
 func (s *cartService) RemoveProductFromCart(ctx context.Context, cartID int64, productID int64) (*models.Cart, error) {
 	s.logger.Info("removing product from cart", "cart_id", cartID, "product_id", productID)
+
 	if err := s.cartRepo.RemoveItem(ctx, cartID, productID); err != nil {
 		s.logger.Error("failed to remove item from cart repo", "cart_id", cartID, "product_id", productID, "error", err)
 		return nil, err
@@ -139,6 +140,7 @@ func (s *cartService) RemoveProductFromCart(ctx context.Context, cartID int64, p
 
 func (s *cartService) GetCartContents(ctx context.Context, cartID int64) (*models.Cart, error) {
 	s.logger.Info("getting cart contents", "cart_id", cartID)
+
 	cart, err := s.cartRepo.GetByID(ctx, cartID)
 	if err != nil {
 		return nil, err
@@ -148,8 +150,9 @@ func (s *cartService) GetCartContents(ctx context.Context, cartID int64) (*model
 
 func (s *cartService) HandleLogin(ctx context.Context, userID int64, anonymousCartID int64) error {
 	s.logger.Info("handling cart merge on login", "user_id", userID, "anonymous_cart_id", anonymousCartID)
+	
 	if anonymousCartID == 0 {
-		return nil // No anonymous cart to merge
+		return nil 
 	}
 
 	userCart, err := s.GetOrCreateCart(ctx, &userID, nil)
