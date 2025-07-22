@@ -11,6 +11,7 @@ import (
 // UserService handles user business logic
 type UserService interface {
 	Register(ctx context.Context, name, email, password string) (*models.User, error)
+	RegisterWithCartMerge(ctx context.Context, store Store, name, email, password string, anonymousCartID *int64) (*models.User, *models.RefreshToken, error)
 	GetProfile(ctx context.Context, userID int64) (*models.User, error)
 	UpdateProfile(ctx context.Context, userID int64, name, email *string) (*models.User, error) 
 	ChangePassword(ctx context.Context, userID int64, currentPassword, newPassword string) error
@@ -19,7 +20,7 @@ type UserService interface {
 
 // AuthService handles authentication business logic
 type AuthService interface {
-	Login(ctx context.Context, email, password string) (*models.User, *models.RefreshToken, error)
+	LoginWithCartMerge(ctx context.Context, store Store, email, password string, anonymousCartID *int64) (*models.User, *models.RefreshToken, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*models.User, *models.RefreshToken, error)
 	Logout(ctx context.Context, refreshToken string) error
 	GetUserSessions(ctx context.Context, userID int64) ([]*models.RefreshToken, error)
@@ -58,5 +59,6 @@ type CartService interface {
     UpdateProductInCart(ctx context.Context, cartID int64, productID int64, quantity int) (*models.Cart, error)
     RemoveProductFromCart(ctx context.Context, cartID int64, productID int64) (*models.Cart, error)
     GetCartContents(ctx context.Context, cartID int64) (*models.Cart, error)
-    HandleLogin(ctx context.Context, userID int64, anonymousCartID int64) error
+	HandleLoginWithTransaction(ctx context.Context, q *Queries, userID int64, anonymousCartID int64) error
 }
+

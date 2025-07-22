@@ -9,7 +9,7 @@ type RefreshToken struct {
 	TokenHash string    `json:"-"`
 	ExpiresAt time.Time `json:"expires_at"`
 	CreatedAt time.Time `json:"created_at"`
-	Token     string    `json:"-"` // Never serialize this
+	Token     string    `json:"-"` 
 }
 
 // SessionInfo represents a sanitized view of a refresh token for API responses

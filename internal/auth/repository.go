@@ -14,10 +14,10 @@ import (
 )
 
 type authRepository struct {
-	db *sql.DB
+	db domain.DBTX
 }
 
-func NewAuthRepository(db *sql.DB) domain.AuthRepository {
+func NewAuthRepository(db domain.DBTX) domain.AuthRepository {
 	return &authRepository{db: db}
 }
 

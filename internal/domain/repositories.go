@@ -3,6 +3,7 @@ package domain
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/purushothdl/ecommerce-api/internal/models"
 )
@@ -58,4 +59,19 @@ type CartRepository interface {
     RemoveItem(ctx context.Context, cartID int64, productID int64) error
 	GetItemsByCartID(ctx context.Context, cartID int64) ([]models.CartItem, error)
 	CleanupOldAnonymousCartItems(ctx context.Context, olderThanDays int) error
+}
+
+type DBTX interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// Queries is a container for all your repository types. This is the key change.
+type Queries struct {
+	UserRepo     UserRepository
+	CartRepo     CartRepository
+	ProductRepo  ProductRepository
+	AuthRepo     AuthRepository
+
 }

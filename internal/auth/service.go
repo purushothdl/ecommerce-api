@@ -17,74 +17,98 @@ import (
 )
 
 type authService struct {
-	userRepo  domain.UserRepository
-	authRepo  domain.AuthRepository
-	jwtSecret string
-	logger    *slog.Logger
+	userRepo    domain.UserRepository
+	authRepo    domain.AuthRepository
+	cartService domain.CartService
+	jwtSecret   string
+	logger      *slog.Logger
 }
 
-func NewAuthService(authRepo domain.AuthRepository, userRepo domain.UserRepository, jwtSecret string, logger *slog.Logger) domain.AuthService {
+func NewAuthService(authRepo domain.AuthRepository, userRepo domain.UserRepository, cartService domain.CartService, jwtSecret string, logger *slog.Logger) domain.AuthService {
 	return &authService{
-		authRepo:  authRepo,
-		userRepo:  userRepo,
-		jwtSecret: jwtSecret,
-		logger:    logger,
+		authRepo:    authRepo,
+		userRepo:    userRepo,
+		cartService: cartService,
+		jwtSecret:   jwtSecret,
+		logger:      logger,
 	}
 }
 
-func (s *authService) Login(ctx context.Context, email, password string) (*models.User, *models.RefreshToken, error) {
-	user, err := s.userRepo.GetByEmail(ctx, email)
-	if err != nil {
-		if errors.Is(err, apperrors.ErrUserNotFound) {
-			s.logger.Error("failed to get user by email during login", "email", email, "error", err)
-			return nil, nil, apperrors.ErrInvalidCredentials
-		}
-		return nil, nil, fmt.Errorf("auth service: could not process login: %w", err)
-	}
+func (s *authService) LoginWithCartMerge(ctx context.Context, store domain.Store, email, password string, anonymousCartID *int64) (*models.User, *models.RefreshToken, error) {
+    // First, authenticate user (outside transaction)
+    user, err := s.userRepo.GetByEmail(ctx, email)
+    if err != nil {
+        if errors.Is(err, apperrors.ErrUserNotFound) {
+            s.logger.Error("failed to get user by email during login", "email", email, "error", err)
+            return nil, nil, apperrors.ErrInvalidCredentials
+        }
+        return nil, nil, fmt.Errorf("auth service: could not process login: %w", err)
+    }
 
-	err = crypto.CheckPasswordHash(password, user.PasswordHash)
-	if err != nil {
-		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			s.logger.Warn("invalid password attempt", "user_id", user.ID, "email", email)
-			return nil, nil, apperrors.ErrInvalidCredentials
-		}
-		return nil, nil, fmt.Errorf("auth service: could not process login: %w", err)
-	}
+    err = crypto.CheckPasswordHash(password, user.PasswordHash)
+    if err != nil {
+        if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+            s.logger.Warn("invalid password attempt", "user_id", user.ID, "email", email)
+            return nil, nil, apperrors.ErrInvalidCredentials
+        }
+        return nil, nil, fmt.Errorf("auth service: could not process login: %w", err)
+    }
 
-	const maxSessionsPerUser = 5
-	existingTokens, err := s.authRepo.GetUserRefreshTokens(ctx, user.ID)
-	if err != nil {
-		s.logger.Error("failed to get user refresh tokens", "user_id", user.ID, "error", err)
-		return nil, nil, fmt.Errorf("auth service: could not check existing sessions: %w", err)
-	}
+    // Now do session management and cart merge in transaction
+    var refreshToken *models.RefreshToken
+    
+    err = store.ExecTx(ctx, func(q *domain.Queries) error {
+        // 1. Manage existing sessions
+        const maxSessionsPerUser = 5
+        existingTokens, err := q.AuthRepo.GetUserRefreshTokens(ctx, user.ID)
+        if err != nil {
+            s.logger.Error("failed to get user refresh tokens", "user_id", user.ID, "error", err)
+            return fmt.Errorf("auth service: could not check existing sessions: %w", err)
+        }
 
-	if len(existingTokens) >= maxSessionsPerUser {
-		oldestToken := existingTokens[len(existingTokens)-1]
-		s.logger.Info(
-			"max sessions reached, revoking oldest token",
-			"user_id", user.ID,
-			"revoked_token_id", oldestToken.ID,
-		)
+        if len(existingTokens) >= maxSessionsPerUser {
+            oldestToken := existingTokens[len(existingTokens)-1]
+            s.logger.Info(
+                "max sessions reached, revoking oldest token",
+                "user_id", user.ID,
+                "revoked_token_id", oldestToken.ID,
+            )
 
-		if err := s.authRepo.RevokeRefreshTokenByID(ctx, oldestToken.ID); err != nil {
-			s.logger.Error("failed to revoke old session", "user_id", user.ID, "error", err)
-			return nil, nil, fmt.Errorf("auth service: could not revoke old session: %w", err)
-		}
-	}
+            if err := q.AuthRepo.RevokeRefreshTokenByID(ctx, oldestToken.ID); err != nil {
+                s.logger.Error("failed to revoke old session", "user_id", user.ID, "error", err)
+                return fmt.Errorf("auth service: could not revoke old session: %w", err)
+            }
+        }
 
-	refreshToken, err := s.GenerateRefreshToken(ctx, user.ID)
-	if err != nil {
-		s.logger.Error("failed to generate refresh token", "user_id", user.ID, "error", err)
-		return nil, nil, fmt.Errorf("auth service: could not generate refresh token: %w", err)
-	}
+        // 2. Generate and store new refresh token
+        refreshToken, err = s.GenerateRefreshToken(ctx, user.ID)
+        if err != nil {
+            s.logger.Error("failed to generate refresh token", "user_id", user.ID, "error", err)
+            return fmt.Errorf("auth service: could not generate refresh token: %w", err)
+        }
 
-	if err := s.authRepo.StoreRefreshToken(ctx, refreshToken); err != nil {
-		s.logger.Error("failed to store refresh token", "user_id", user.ID, "error", err)
-		return nil, nil, fmt.Errorf("auth service: could not store refresh token: %w", err)
-	}
+        if err := q.AuthRepo.StoreRefreshToken(ctx, refreshToken); err != nil {
+            s.logger.Error("failed to store refresh token", "user_id", user.ID, "error", err)
+            return fmt.Errorf("auth service: could not store refresh token: %w", err)
+        }
 
-	return user, refreshToken, nil
+        // 3. Handle cart merge if needed
+        if anonymousCartID != nil && *anonymousCartID != 0 {
+            if err := s.cartService.HandleLoginWithTransaction(ctx, q, user.ID, *anonymousCartID); err != nil {
+                return fmt.Errorf("failed to merge cart: %w", err)
+            }
+        }
+
+        return nil
+    })
+
+    if err != nil {
+        return nil, nil, err
+    }
+
+    return user, refreshToken, nil
 }
+
 
 func (s *authService) RefreshToken(ctx context.Context, tokenPlaintext string) (*models.User, *models.RefreshToken, error) {
 	s.logger.Info("processing refresh token request")

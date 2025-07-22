@@ -21,7 +21,8 @@ type Server struct {
 	productService  domain.ProductService
 	categoryService domain.CategoryService
 	cartService     domain.CartService
-	isProduction    bool // Add this field
+	store 			domain.Store
+	isProduction    bool 
 }
 
 // New creates and initializes a new Server instance.
@@ -33,7 +34,9 @@ func New(
 	adminService    domain.AdminService,
 	productService  domain.ProductService,
 	categoryService domain.CategoryService,
-	cartService     domain.CartService,
+	cartService     domain.CartService,	
+	store 			domain.Store,
+
 ) *Server {
 	s := &Server{
 		config:          config,
@@ -45,6 +48,7 @@ func New(
 		productService:  productService,
 		categoryService: categoryService,
 		cartService:     cartService,
+		store: 			store,
 		isProduction:    config.Env == "production", 
 	}
 

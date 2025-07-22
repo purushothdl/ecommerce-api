@@ -12,8 +12,8 @@ import (
 )
 
 func (s *Server) registerRoutes() {
-	userHandler := user.NewHandler(s.userService, s.authService, s.cartService, s.config.JWT.Secret, s.isProduction, s.logger)
-	authHandler := auth.NewHandler(s.authService, s.cartService, s.config.JWT.Secret, s.isProduction, s.logger)
+	userHandler := user.NewHandler(s.userService, s.authService, s.cartService, s.store, s.config.JWT.Secret, s.isProduction, s.logger)
+	authHandler := auth.NewHandler(s.authService, s.store, s.cartService, s.config.JWT.Secret, s.isProduction, s.logger)
 	adminHandler := admin.NewHandler(s.adminService, s.logger)
 	productHandler := product.NewHandler(s.productService, s.categoryService, s.logger)
 	cartHandler := cart.NewHandler(s.cartService, s.logger)

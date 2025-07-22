@@ -20,6 +20,7 @@ import (
 
 type Handler struct {
 	authService  domain.AuthService
+	store   	 domain.Store
 	cartService  domain.CartService
 	jwtSecret    string
 	isProduction bool
@@ -28,6 +29,7 @@ type Handler struct {
 
 func NewHandler(
 	authService  domain.AuthService, 
+	store 		 domain.Store,
 	cartService  domain.CartService, 
 	jwtSecret    string, 
 	isProduction bool, 
@@ -35,6 +37,7 @@ func NewHandler(
 ) *Handler {
 	return &Handler{
 		authService:  authService,
+		store:        store,
 		cartService:  cartService,
 		jwtSecret:    jwtSecret,
 		isProduction: isProduction,
@@ -44,62 +47,59 @@ func NewHandler(
 
 // HandleLogin authenticates user and returns access/refresh tokens
 func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
-	var input CreateTokenRequest
+    var input CreateTokenRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		response.Error(w, http.StatusBadRequest, "Invalid request payload")
-		return
-	}
+    if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+        response.Error(w, http.StatusBadRequest, "Invalid request payload")
+        return
+    }
 
-	h.logger.Info("login request received", "email", input.Email)
+    h.logger.Info("login request received", "email", input.Email)
 
-	v := validator.New()
-	if input.Validate(v); !v.Valid() {
-		h.logger.Warn("login validation failed", "email", input.Email, "errors", v.Errors)
-		response.JSON(w, http.StatusUnprocessableEntity, v.Errors)
-		return
-	}
+    v := validator.New()
+    if input.Validate(v); !v.Valid() {
+        h.logger.Warn("login validation failed", "email", input.Email, "errors", v.Errors)
+        response.JSON(w, http.StatusUnprocessableEntity, v.Errors)
+        return
+    }
 
-	user, refreshToken, err := h.authService.Login(r.Context(), input.Email, input.Password)
-	if err != nil {
-		h.logger.Warn("auth service login failed", "email", input.Email, "error", err)
-		response.Error(w, http.StatusUnauthorized, "Invalid email or password")
-		return
-	}
+    // Parse anonymous cart ID
+    var anonymousCartID *int64
+    if cookie, err := r.Cookie(web.CartIDCookieName); err == nil {
+        if id, parseErr := strconv.ParseInt(cookie.Value, 10, 64); parseErr == nil {
+            anonymousCartID = &id
+        }
+    }
 
-	accessToken, err := GenerateAccessToken(user, h.jwtSecret)
-	if err != nil {
-		h.logger.Error("could not generate access token", "user_id", user.ID, "error", err)
-		response.Error(w, http.StatusInternalServerError, "Could not generate authentication token")
-		return
-	}
+    // Single transactional login call
+    user, refreshToken, err := h.authService.LoginWithCartMerge(r.Context(), h.store, input.Email, input.Password, anonymousCartID)
+    if err != nil {
+        h.logger.Warn("auth service login failed", "email", input.Email, "error", err)
+        response.Error(w, http.StatusUnauthorized, "Invalid email or password")
+        return
+    }
 
-	// Merge anonymous cart if exists
-	var anonymousCartID int64
-	if cookie, err := r.Cookie(web.CartIDCookieName); err == nil {
-		if id, parseErr := strconv.ParseInt(cookie.Value, 10, 64); parseErr == nil {
-			anonymousCartID = id
-		} else {
-			h.logger.Warn("failed to parse cart_id cookie", "cookie_value", cookie.Value, "error", parseErr)
-		}
-	}
+    // Clear cart cookie if merged
+    if anonymousCartID != nil && *anonymousCartID != 0 {
+        web.ClearCookie(w, web.CartIDCookieName, h.isProduction)
+    }
 
-	if anonymousCartID != 0 {
-		if err := h.cartService.HandleLogin(r.Context(), user.ID, anonymousCartID); err != nil {
-			h.logger.Error("cart merge failed", "user_id", user.ID, "anonymous_cart_id", anonymousCartID, "error", err)
-		} else {
-			web.ClearCookie(w, web.CartIDCookieName, h.isProduction)
-		}
-	}
+    // Generate access token (outside transaction)
+    accessToken, err := GenerateAccessToken(user, h.jwtSecret)
+    if err != nil {
+        h.logger.Error("could not generate access token", "user_id", user.ID, "error", err)
+        response.Error(w, http.StatusInternalServerError, "Could not generate authentication token")
+        return
+    }
 
-	web.SetRefreshTokenCookie(w, refreshToken.Token, h.isProduction)
+    web.SetRefreshTokenCookie(w, refreshToken.Token, h.isProduction)
 
-	payload := LoginResponse{
-		AccessToken: accessToken,
-	}
-	response.JSON(w, http.StatusOK, payload)
-	
-	h.logger.Info("user logged in successfully", "user_id", user.ID)
+    payload := LoginResponse{
+        AccessToken: accessToken,
+    }
+    response.JSON(w, http.StatusOK, payload)
+    
+    h.logger.Info("user logged in successfully", "user_id", user.ID)
 }
 
 // HandleRefreshToken handles requests to refresh an access token using a valid refresh token
@@ -151,6 +151,7 @@ func (h *Handler) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	web.ClearCookie(w, web.RefreshTokenCookieName, h.isProduction)
+	web.ClearCookie(w, web.CartIDCookieName, h.isProduction)
 
 	resp := response.MessageResponse{Message: "Logged out successfully"}
 	response.JSON(w, http.StatusOK, resp)

@@ -21,95 +21,84 @@ type Handler struct {
 	userService  domain.UserService
 	authService  domain.AuthService
 	cartService  domain.CartService
+	store        domain.Store
 	jwtSecret    string
 	isProduction bool
 	logger       *slog.Logger
 }
 
-func NewHandler(userService domain.UserService, authService domain.AuthService, cartService domain.CartService, jwtSecret string, isProduction bool, logger *slog.Logger) *Handler {
-	return &Handler{
-		userService:  userService,
-		authService:  authService,
-		cartService:  cartService,
-		jwtSecret:    jwtSecret,
-		isProduction: isProduction,
-		logger:       logger,
-	}
+func NewHandler(userService domain.UserService, authService domain.AuthService, cartService domain.CartService, store domain.Store, jwtSecret string, isProduction bool, logger *slog.Logger) *Handler {
+    return &Handler{
+        userService:  userService,
+        authService:  authService,
+        cartService:  cartService,
+        store:        store,
+        jwtSecret:    jwtSecret,
+        isProduction: isProduction,
+        logger:       logger,
+    }
 }
 
 func (h *Handler) HandleRegister(w http.ResponseWriter, r *http.Request) {
-	h.logger.Info("register user request received")
-	var input CreateUserRequest
+    h.logger.Info("register user request received")
+    var input CreateUserRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		h.logger.Warn("invalid request payload", "error", err)
-		response.Error(w, http.StatusBadRequest, "Invalid request payload")
-		return
-	}
+    if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+        h.logger.Warn("invalid request payload", "error", err)
+        response.Error(w, http.StatusBadRequest, "Invalid request payload")
+        return
+    }
 
-	v := validator.New()
-	if input.Validate(v); !v.Valid() {
-		h.logger.Warn("validation failed", "errors", v.Errors)
-		response.JSON(w, http.StatusUnprocessableEntity, v.Errors)
-		return
-	}
+    v := validator.New()
+    if input.Validate(v); !v.Valid() {
+        h.logger.Warn("validation failed", "errors", v.Errors)
+        response.JSON(w, http.StatusUnprocessableEntity, v.Errors)
+        return
+    }
 
-	// Create user account
-	user, err := h.userService.Register(r.Context(), input.Name, input.Email, input.Password)
-	if err != nil {
-		if errors.Is(err, apperrors.ErrDuplicateEmail) {
-			h.logger.Warn("duplicate email", "email", input.Email)
-			response.Error(w, http.StatusConflict, "Email address is already in use")
-		} else {
-			h.logger.Error("failed to register user", "error", err)
-			response.Error(w, http.StatusInternalServerError, "Could not create user")
-		}
-		return
-	}
+    // Parse anonymous cart ID
+    var anonymousCartID *int64
+    if cookie, err := r.Cookie(web.CartIDCookieName); err == nil {
+        if id, parseErr := strconv.ParseInt(cookie.Value, 10, 64); parseErr == nil {
+            anonymousCartID = &id
+        }
+    }
 
-	// Merge anonymous cart if exists
-	var anonymousCartID int64
-	if cookie, err := r.Cookie(web.CartIDCookieName); err == nil {
-		if id, parseErr := strconv.ParseInt(cookie.Value, 10, 64); parseErr == nil {
-			anonymousCartID = id
-		} else {
-			h.logger.Warn("failed to parse cart_id cookie", "cookie_value", cookie.Value, "error", parseErr)
-		}
-	}
+    // Single transactional call
+    user, refreshToken, err := h.userService.RegisterWithCartMerge(r.Context(), h.store, input.Name, input.Email, input.Password, anonymousCartID)
+    if err != nil {
+        if errors.Is(err, apperrors.ErrDuplicateEmail) {
+            h.logger.Warn("duplicate email", "email", input.Email)
+            response.Error(w, http.StatusConflict, "Email address is already in use")
+        } else {
+            h.logger.Error("failed to register user", "error", err)
+            response.Error(w, http.StatusInternalServerError, "Could not create user")
+        }
+        return
+    }
 
-	if anonymousCartID != 0 {
-		if err := h.cartService.HandleLogin(r.Context(), user.ID, anonymousCartID); err != nil {
-			h.logger.Error("failed to merge cart", "user_id", user.ID, "anonymous_cart_id", anonymousCartID, "error", err)
-		} else {
-			web.ClearCookie(w, web.CartIDCookieName, h.isProduction)
-			h.logger.Info("successfully merged cart", "user_id", user.ID, "anonymous_cart_id", anonymousCartID)
-		}
-	}
+    // Clear cart cookie if merged
+    if anonymousCartID != nil && *anonymousCartID != 0 {
+        web.ClearCookie(w, web.CartIDCookieName, h.isProduction)
+    }
 
-	// Auto-login after registration
-	refreshToken, err := h.authService.GenerateRefreshToken(r.Context(), user.ID)
-	if err != nil {
-		h.logger.Error("failed to create refresh token", "user_id", user.ID, "error", err)
-		response.JSON(w, http.StatusCreated, dto.NewUserResponse(user))
-		return
-	}
+    // Generate access token (doesn't need transaction)
+    accessToken, err := h.authService.GenerateAccessToken(r.Context(), user)
+    if err != nil {
+        h.logger.Error("failed to generate access token", "user_id", user.ID, "error", err)
+        response.JSON(w, http.StatusCreated, dto.NewUserResponse(user))
+        return
+    }
 
-	accessToken, err := h.authService.GenerateAccessToken(r.Context(), user)
-	if err != nil {
-		h.logger.Error("failed to generate access token", "user_id", user.ID, "error", err)
-		response.JSON(w, http.StatusCreated, dto.NewUserResponse(user))
-		return
-	}
+    web.SetRefreshTokenCookie(w, refreshToken.Token, h.isProduction)
 
-	web.SetRefreshTokenCookie(w, refreshToken.Token, h.isProduction)
+    payload := LoginResponse{
+        User:        dto.NewUserResponse(user),
+        AccessToken: accessToken,
+    }
 
-	payload := LoginResponse{
-		User:        dto.NewUserResponse(user),
-		AccessToken: accessToken,
-	}
-
-	response.JSON(w, http.StatusCreated, payload)
-	h.logger.Info("user registered and logged in", "user_id", user.ID, "email", user.Email)
+    response.JSON(w, http.StatusCreated, payload)
+    h.logger.Info("user registered and logged in", "user_id", user.ID, "email", user.Email)
 }
 
 func (h *Handler) HandleGetProfile(w http.ResponseWriter, r *http.Request) {

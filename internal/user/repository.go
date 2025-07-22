@@ -14,11 +14,11 @@ import (
 )
 
 type userRepository struct {
-	db *sql.DB
+	db domain.DBTX
 }
 
 // NewUserRepository returns a domain.UserRepository implementation
-func NewUserRepository(db *sql.DB) domain.UserRepository {
+func NewUserRepository(db domain.DBTX) domain.UserRepository {
 	return &userRepository{db: db}
 }
 

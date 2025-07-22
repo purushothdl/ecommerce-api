@@ -148,30 +148,33 @@ func (s *cartService) GetCartContents(ctx context.Context, cartID int64) (*model
 	return s.getCartWithItems(ctx, cart)
 }
 
-func (s *cartService) HandleLogin(ctx context.Context, userID int64, anonymousCartID int64) error {
-	s.logger.Info("handling cart merge on login", "user_id", userID, "anonymous_cart_id", anonymousCartID)
-	
-	if anonymousCartID == 0 {
-		return nil 
-	}
+// Add to internal/cart/service.go
+func (s *cartService) HandleLoginWithTransaction(ctx context.Context, q *domain.Queries, userID int64, anonymousCartID int64) error {
+    if anonymousCartID == 0 {
+        return nil 
+    }
 
-	userCart, err := s.GetOrCreateCart(ctx, &userID, nil)
-	if err != nil {
-		return fmt.Errorf("could not get or create user cart during login merge: %w", err)
-	}
+    userCart, err := q.CartRepo.GetByUserID(ctx, userID)
+    if err != nil {
+        if errors.Is(err, apperrors.ErrNotFound) {
+            userCart, err = q.CartRepo.Create(ctx, &userID)
+            if err != nil {
+                return fmt.Errorf("failed to create user cart: %w", err)
+            }
+        } else {
+            return fmt.Errorf("failed to get user cart: %w", err)
+        }
+    }
 
-	if userCart.ID == anonymousCartID {
-		return nil // This can happen if a logged-in user's cookie persists. Nothing to do.
-	}
+    if userCart.ID == anonymousCartID {
+        return nil // Same cart, nothing to merge
+    }
 
-	// This is where the merge happens
-	if err := s.cartRepo.MergeCarts(ctx, anonymousCartID, userCart.ID); err != nil {
-		s.logger.Error("failed to merge carts in repository", "from_cart", anonymousCartID, "to_cart", userCart.ID, "error", err)
-		return err
-	}
+    // Merge carts
+    if err := q.CartRepo.MergeCarts(ctx, anonymousCartID, userCart.ID); err != nil {
+        return fmt.Errorf("failed to merge carts: %w", err)
+    }
 
-	s.logger.Info("successfully merged carts", "from_cart", anonymousCartID, "to_cart", userCart.ID)
-
-	// Clean up the old anonymous cart
-	return s.cartRepo.Delete(ctx, anonymousCartID)
+    // Delete anonymous cart
+    return q.CartRepo.Delete(ctx, anonymousCartID)
 }

@@ -14,10 +14,10 @@ import (
 )
 
 type productRepository struct {
-	db *sql.DB
+	db domain.DBTX
 }
 
-func NewProductRepository(db *sql.DB) domain.ProductRepository {
+func NewProductRepository(db domain.DBTX) domain.ProductRepository {
 	return &productRepository{db: db}
 }
 

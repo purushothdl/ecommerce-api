@@ -32,6 +32,7 @@ type application struct {
 	adminService    domain.AdminService
 	productService  domain.ProductService
 	categoryService domain.CategoryService
+	store 			domain.Store
 	cartService     domain.CartService
 }
 
@@ -64,6 +65,9 @@ func run() error {
 		"max_idle_conns", cfg.DB.MaxIdleConns,
 	)
 
+	// Initialize store for transactions
+	store := database.NewStore(db)
+
 	// Setup repositories (implement domain interfaces)
 	userRepo := user.NewUserRepository(db)
 	authRepo := auth.NewAuthRepository(db)
@@ -72,12 +76,12 @@ func run() error {
 	cartRepo := cart.NewCartRepository(db)
 
 	// Setup services (implement domain interfaces)
-	userService := user.NewUserService(userRepo, logger)
-	authService := auth.NewAuthService(authRepo, userRepo, cfg.JWT.Secret, logger)
+	cartService := cart.NewCartService(cartRepo, productRepo, logger)
+	authService := auth.NewAuthService(authRepo, userRepo, cartService, cfg.JWT.Secret, logger)
+	userService := user.NewUserService(userRepo, authService, cartService, logger)	
 	adminService := admin.NewAdminService(userRepo, logger)
 	categoryService := category.NewCategoryService(categoryRepo, logger)
 	productService := product.NewProductService(productRepo, logger)
-	cartService := cart.NewCartService(cartRepo, productRepo, logger)
 
 	app := &application{
 		config:          cfg,
@@ -87,6 +91,7 @@ func run() error {
 		adminService:    adminService,
 		productService:  productService,
 		categoryService: categoryService,
+		store: 			 store,
 		cartService:     cartService,
 	}
 
@@ -100,7 +105,7 @@ func (app *application) startServer() error {
 		Handler: server.New(
 			app.config, app.logger, app.userService, app.authService,
 			app.adminService, app.productService, app.categoryService,
-			app.cartService,
+			app.cartService, app.store,
 		).Router(),
 		ReadTimeout:  app.config.Server.ReadTimeout,
 		WriteTimeout: app.config.Server.WriteTimeout,

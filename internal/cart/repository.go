@@ -13,10 +13,10 @@ import (
 )
 
 type cartRepository struct {
-	db *sql.DB
+	db domain.DBTX
 }
 
-func NewCartRepository(db *sql.DB) domain.CartRepository {
+func NewCartRepository(db domain.DBTX) domain.CartRepository {
 	return &cartRepository{db: db}
 }
 
