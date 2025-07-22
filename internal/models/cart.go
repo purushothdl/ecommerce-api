@@ -10,8 +10,8 @@ type Cart struct {
 }
 
 type CartItem struct {
-    ID        int64    `json:"-"` // Internal ID, not exposed
-    CartID    int64    `json:"-"`
+	BaseModel
+	CartID    int64    `json:"-"`
     Product   *Product `json:"product"` // Eager load product details
     Quantity  int      `json:"quantity"`
 }

@@ -16,78 +16,75 @@ import (
 	"github.com/purushothdl/ecommerce-api/pkg/validator"
 )
 
-// Handler holds dependencies for cart-related HTTP handlers.
 type Handler struct {
 	cartSvc domain.CartService
 	logger  *slog.Logger
 }
 
-// NewHandler creates a new cart handler.
 func NewHandler(cartSvc domain.CartService, logger *slog.Logger) *Handler {
 	return &Handler{cartSvc: cartSvc, logger: logger}
 }
 
-
-// HandleGetCart retrieves the current user's or session's cart.
+// HandleGetCart returns the cart with items and totals
 func (h *Handler) HandleGetCart(w http.ResponseWriter, r *http.Request) {
-	// The CartMiddleware has already done the hard work of finding or creating a cart.
-	cart, err := context.GetCart(r.Context())
+	cartCtx, err := context.GetCart(r.Context())
 	if err != nil {
-		h.logger.Error("could not get cart from context in handler", "error", err)
-		response.Error(w, http.StatusInternalServerError, "could not retrieve cart from context")
+		h.logger.Error("cart context missing", "error", err)
+		response.Error(w, http.StatusInternalServerError, "cart unavailable")
 		return
 	}
 
-	// The cart in the context is just the base cart object.
-	// We need to call the service to populate it with items and totals.
-	fullCart, err := h.cartSvc.GetCartContents(r.Context(), cart.ID)
+	fullCart, err := h.cartSvc.GetCartContents(r.Context(), cartCtx.ID)
 	if err != nil {
-		h.logger.Error("failed to get full cart contents", "cart_id", cart.ID, "error", err)
-		response.Error(w, http.StatusInternalServerError, "could not retrieve cart contents")
+		h.logger.Error("failed to load cart", "cart_id", cartCtx.ID, "error", err)
+		response.Error(w, http.StatusInternalServerError, "could not load cart")
 		return
 	}
 
-	h.logger.Info("successfully retrieved cart", "cart_id", fullCart.ID, "item_count", len(fullCart.Items))
-	response.JSON(w, http.StatusOK, fullCart)
+	// Use NewCartResponse to format the response
+	resp := NewCartResponse(fullCart, fullCart.Items)
+	response.JSON(w, http.StatusOK, resp)
 }
 
-// HandleAddItem adds a new product or increases the quantity of an existing one in the cart.
+// HandleAddItem adds a product to the cart
 func (h *Handler) HandleAddItem(w http.ResponseWriter, r *http.Request) {
-	cart, err := context.GetCart(r.Context())
+	cartCtx, err := context.GetCart(r.Context())
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, "could not retrieve cart from context")
+		response.Error(w, http.StatusInternalServerError, "cart unavailable")
 		return
 	}
 
 	var input AddItemRequest
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		response.Error(w, http.StatusBadRequest, "invalid request payload")
+		response.Error(w, http.StatusBadRequest, "invalid request format")
 		return
 	}
 
+	// Validate input
 	v := validator.New()
 	if input.Validate(v); !v.Valid() {
-		response.JSON(w, http.StatusUnprocessableEntity, v.Errors)
+		response.ValidationError(w, v.Errors)
 		return
 	}
 
-	h.logger.Info("request to add item to cart", "cart_id", cart.ID, "product_id", input.ProductID, "quantity", input.Quantity)
-
-	updatedCart, err := h.cartSvc.AddProductToCart(r.Context(), cart.ID, input.ProductID, input.Quantity)
+	// Business logic
+	updatedCart, err := h.cartSvc.AddProductToCart(r.Context(), cartCtx.ID, input.ProductID, input.Quantity)
 	if err != nil {
 		switch {
 		case errors.Is(err, apperrors.ErrNotFound):
 			response.Error(w, http.StatusNotFound, "product not found")
 		case errors.Is(err, apperrors.ErrInsufficientStock):
-			response.Error(w, http.StatusConflict, "insufficient stock for the requested quantity")
+			response.Error(w, http.StatusConflict, "insufficient stock")
 		default:
-			h.logger.Error("unhandled error adding item to cart", "error", err)
-			response.Error(w, http.StatusInternalServerError, "could not add item to cart")
+			h.logger.Error("cart update failed", "error", err)
+			response.Error(w, http.StatusInternalServerError, "could not update cart")
 		}
 		return
 	}
 
-	response.JSON(w, http.StatusOK, updatedCart)
+	// Format response
+	resp := NewCartResponse(updatedCart, updatedCart.Items)
+	response.JSON(w, http.StatusOK, resp)
 }
 
 // HandleUpdateItem changes the quantity of a specific item in the cart.

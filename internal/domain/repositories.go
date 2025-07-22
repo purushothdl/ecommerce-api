@@ -57,4 +57,5 @@ type CartRepository interface {
     UpdateItemQuantity(ctx context.Context, cartID int64, productID int64, quantity int) error
     RemoveItem(ctx context.Context, cartID int64, productID int64) error
 	GetItemsByCartID(ctx context.Context, cartID int64) ([]models.CartItem, error)
+	CleanupOldAnonymousCartItems(ctx context.Context, olderThanDays int) error
 }
