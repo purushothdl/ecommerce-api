@@ -13,13 +13,14 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/purushothdl/ecommerce-api/configs"
+	"github.com/purushothdl/ecommerce-api/internal/address"
 	"github.com/purushothdl/ecommerce-api/internal/admin"
 	"github.com/purushothdl/ecommerce-api/internal/auth"
 	"github.com/purushothdl/ecommerce-api/internal/cart"
 	"github.com/purushothdl/ecommerce-api/internal/category"
-	"github.com/purushothdl/ecommerce-api/internal/product"
 	"github.com/purushothdl/ecommerce-api/internal/database"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
+	"github.com/purushothdl/ecommerce-api/internal/product"
 	"github.com/purushothdl/ecommerce-api/internal/server"
 	"github.com/purushothdl/ecommerce-api/internal/user"
 )
@@ -34,6 +35,7 @@ type application struct {
 	categoryService domain.CategoryService
 	store 			domain.Store
 	cartService     domain.CartService
+	addressService  domain.AddressService
 }
 
 func main() {
@@ -74,14 +76,16 @@ func run() error {
 	categoryRepo := category.NewCategoryRepository(db)
 	productRepo := product.NewProductRepository(db)
 	cartRepo := cart.NewCartRepository(db)
+	addressRepo := address.NewAddressRepository(db)
 
 	// Setup services (implement domain interfaces)
-	cartService := cart.NewCartService(cartRepo, productRepo, logger)
+	cartService := cart.NewCartService(cartRepo, productRepo, store, logger)
 	authService := auth.NewAuthService(authRepo, userRepo, cartService, cfg.JWT.Secret, logger)
 	userService := user.NewUserService(userRepo, authService, cartService, logger)	
 	adminService := admin.NewAdminService(userRepo, logger)
 	categoryService := category.NewCategoryService(categoryRepo, logger)
 	productService := product.NewProductService(productRepo, logger)
+	addressService := address.NewAddressService(addressRepo, store, logger)
 
 	app := &application{
 		config:          cfg,
@@ -93,6 +97,7 @@ func run() error {
 		categoryService: categoryService,
 		store: 			 store,
 		cartService:     cartService,
+		addressService:  addressService,
 	}
 
 	// Start server
@@ -105,7 +110,7 @@ func (app *application) startServer() error {
 		Handler: server.New(
 			app.config, app.logger, app.userService, app.authService,
 			app.adminService, app.productService, app.categoryService,
-			app.cartService, app.store,
+			app.cartService, app.store, app.addressService,
 		).Router(),
 		ReadTimeout:  app.config.Server.ReadTimeout,
 		WriteTimeout: app.config.Server.WriteTimeout,

@@ -1,15 +1,16 @@
 package database
 
 import (
-    "context"
-    "database/sql"
-    "fmt"
+	"context"
+	"database/sql"
+	"fmt"
 
-    "github.com/purushothdl/ecommerce-api/internal/auth"
-    "github.com/purushothdl/ecommerce-api/internal/cart"
-    "github.com/purushothdl/ecommerce-api/internal/domain"
-    "github.com/purushothdl/ecommerce-api/internal/product"
-    "github.com/purushothdl/ecommerce-api/internal/user"
+	"github.com/purushothdl/ecommerce-api/internal/address"
+	"github.com/purushothdl/ecommerce-api/internal/auth"
+	"github.com/purushothdl/ecommerce-api/internal/cart"
+	"github.com/purushothdl/ecommerce-api/internal/domain"
+	"github.com/purushothdl/ecommerce-api/internal/product"
+	"github.com/purushothdl/ecommerce-api/internal/user"
 )
 
 // sqlStore provides all functions to execute SQL queries and transactions.
@@ -38,6 +39,7 @@ func (s *sqlStore) ExecTx(ctx context.Context, fn func(q *domain.Queries) error)
         CartRepo:    cart.NewCartRepository(tx),
         ProductRepo: product.NewProductRepository(tx),
         AuthRepo:    auth.NewAuthRepository(tx),
+        AddressRepo: address.NewAddressRepository(tx),
     }
 
     // Execute the callback, passing our single Queries object.

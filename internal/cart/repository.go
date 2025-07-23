@@ -20,8 +20,6 @@ func NewCartRepository(db domain.DBTX) domain.CartRepository {
 	return &cartRepository{db: db}
 }
 
-// ... (implement all the interface methods)
-
 func (r *cartRepository) GetByUserID(ctx context.Context, userID int64) (*models.Cart, error) {
 	query := `SELECT id, user_id, created_at, updated_at FROM carts WHERE user_id = $1`
 	var cart models.Cart
@@ -64,38 +62,82 @@ func (r *cartRepository) Delete(ctx context.Context, cartID int64) error {
 }
 
 func (r *cartRepository) AddItem(ctx context.Context, cartID int64, productID int64, quantity int) error {
-    // Updated to handle timestamps properly
-    query := `
+	// 1. Get current product stock and current quantity in cart in one go
+	var stockQuantity int
+	var currentCartQuantity sql.NullInt64 
+
+	// This query locks the product row until the transaction is committed,
+	// preventing other users from buying it at the same time.
+	productQuery := `SELECT stock_quantity FROM products WHERE id = $1 FOR UPDATE`
+	err := r.db.QueryRowContext(ctx, productQuery, productID).Scan(&stockQuantity)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return apperrors.ErrNotFound 
+		}
+		return fmt.Errorf("cart repo: failed to get product stock: %w", err)
+	}
+
+	cartItemQuery := `SELECT quantity FROM cart_items WHERE cart_id = $1 AND product_id = $2`
+	// This might return no rows, which is fine.
+	_ = r.db.QueryRowContext(ctx, cartItemQuery, cartID, productID).Scan(&currentCartQuantity)
+
+	// 2. Check if there is enough stock
+	totalQuantityNeeded := quantity
+	if currentCartQuantity.Valid {
+		totalQuantityNeeded += int(currentCartQuantity.Int64)
+	}
+
+	if stockQuantity < totalQuantityNeeded {
+		return apperrors.ErrInsufficientStock
+	}
+
+	// 3. If stock is sufficient, insert or update the cart item
+	upsertQuery := `
         INSERT INTO cart_items (cart_id, product_id, quantity, created_at, updated_at)
         VALUES ($1, $2, $3, NOW(), NOW())
         ON CONFLICT (cart_id, product_id)
         DO UPDATE SET 
             quantity = cart_items.quantity + EXCLUDED.quantity,
-            updated_at = NOW()`  
-    
-    _, err := r.db.ExecContext(ctx, query, cartID, productID, quantity)
-    if err != nil {
-        return fmt.Errorf("cart repo: add item: %w", err)
-    }
-
-    // Update cart's updated_at timestamp
-    _, err = r.db.ExecContext(ctx, "UPDATE carts SET updated_at = NOW() WHERE id = $1", cartID)
-    return err
+            updated_at = NOW()`
+	
+	_, err = r.db.ExecContext(ctx, upsertQuery, cartID, productID, quantity)
+	if err != nil {
+		return fmt.Errorf("cart repo: add item upsert failed: %w", err)
+	}
+	
+	// 4. Update the cart's own timestamp
+	_, err = r.db.ExecContext(ctx, "UPDATE carts SET updated_at = NOW() WHERE id = $1", cartID)
+	return err
 }
 
-func (r *cartRepository) UpdateItemQuantity(ctx context.Context, cartID int64, productID int64, quantity int) error {
-    query := `
+
+func (r *cartRepository) UpdateItemQuantity(ctx context.Context, cartID int64, productID int64, newQuantity int) error {
+	var stockQuantity int
+	productQuery := `SELECT stock_quantity FROM products WHERE id = $1 FOR UPDATE`
+	err := r.db.QueryRowContext(ctx, productQuery, productID).Scan(&stockQuantity)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return apperrors.ErrNotFound
+		}
+		return fmt.Errorf("cart repo: failed to get product stock: %w", err)
+	}
+
+	if stockQuantity < newQuantity {
+		return apperrors.ErrInsufficientStock
+	}
+
+	query := `
         UPDATE cart_items 
         SET quantity = $1, updated_at = NOW() 
         WHERE cart_id = $2 AND product_id = $3`
-    
-    _, err := r.db.ExecContext(ctx, query, quantity, cartID, productID)
-    if err != nil {
-        return fmt.Errorf("cart repo: update item: %w", err)
-    }
+	
+	_, err = r.db.ExecContext(ctx, query, newQuantity, cartID, productID)
+	if err != nil {
+		return fmt.Errorf("cart repo: update item failed: %w", err)
+	}
 
     _, err = r.db.ExecContext(ctx, "UPDATE carts SET updated_at = NOW() WHERE id = $1", cartID)
-    return err
+	return err
 }
 
 func (r *cartRepository) RemoveItem(ctx context.Context, cartID int64, productID int64) error {

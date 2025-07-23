@@ -61,6 +61,27 @@ type CartRepository interface {
 	CleanupOldAnonymousCartItems(ctx context.Context, olderThanDays int) error
 }
 
+// AddressRepository handles user address data operations
+type AddressRepository interface {
+    Create(ctx context.Context, addr *models.UserAddress) error
+    GetByID(ctx context.Context, id int64) (*models.UserAddress, error)
+    GetByUserID(ctx context.Context, userID int64) ([]*models.UserAddress, error)
+    Update(ctx context.Context, addr *models.UserAddress) error
+    Delete(ctx context.Context, id int64, userID int64) error
+    UnsetDefaultShipping(ctx context.Context, userID int64) error
+    UnsetDefaultBilling(ctx context.Context, userID int64) error
+}
+
+type OrderRepository interface {
+    Create(ctx context.Context, order *models.Order) error
+    CreateItems(ctx context.Context, items []*models.OrderItem) error
+    GetByID(ctx context.Context, id int64, userID int64) (*models.Order, error)
+    GetItemsByOrderID(ctx context.Context, orderID int64) ([]*models.OrderItem, error)
+    GetByUserID(ctx context.Context, userID int64) ([]*models.Order, error)
+    UpdateStatus(ctx context.Context, id int64, status models.OrderStatus) error
+    UpdatePaymentStatus(ctx context.Context, id int64, status models.PaymentStatus) error
+}
+
 type DBTX interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
@@ -73,5 +94,7 @@ type Queries struct {
 	CartRepo     CartRepository
 	ProductRepo  ProductRepository
 	AuthRepo     AuthRepository
+	AddressRepo  AddressRepository
+	OrderRepo    OrderRepository
 
 }

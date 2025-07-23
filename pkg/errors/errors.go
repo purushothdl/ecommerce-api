@@ -24,4 +24,5 @@ var (
 	ErrUnexpectedMethod   = errors.New("unexpected signing method")
 	ErrSessionNotFound 	  = errors.New("session not found")
 	ErrWeakPassword       = errors.New("password too weak")
+	ErrUnauthorized       = errors.New("unauthorized")
 )

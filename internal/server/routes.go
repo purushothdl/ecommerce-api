@@ -3,6 +3,7 @@ package server
 
 import (
 	"github.com/go-chi/chi/v5"
+	"github.com/purushothdl/ecommerce-api/internal/address"
 	"github.com/purushothdl/ecommerce-api/internal/admin"
 	"github.com/purushothdl/ecommerce-api/internal/auth"
 	"github.com/purushothdl/ecommerce-api/internal/cart"
@@ -17,14 +18,15 @@ func (s *Server) registerRoutes() {
 	adminHandler := admin.NewHandler(s.adminService, s.logger)
 	productHandler := product.NewHandler(s.productService, s.categoryService, s.logger)
 	cartHandler := cart.NewHandler(s.cartService, s.logger)
+	addressHandler := address.NewHandler(s.addressService, s.logger)
 
 	// API versioning
 	s.router.Route("/api/v1", func(r chi.Router) {
-		s.registerV1Routes(r, userHandler, authHandler, adminHandler, productHandler, cartHandler)
+		s.registerV1Routes(r, userHandler, authHandler, adminHandler, productHandler, cartHandler, addressHandler)
 	})
 }
 
-func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authHandler *auth.Handler, adminHandler *admin.Handler, productHandler *product.Handler, cartHandler *cart.Handler) {
+func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authHandler *auth.Handler, adminHandler *admin.Handler, productHandler *product.Handler, cartHandler *cart.Handler, addressHandler *address.Handler) {
 	// Auth routes
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.TimeoutMiddleware(s.config.Timeouts.Auth))
@@ -54,6 +56,14 @@ func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authH
 		r.Get("/auth/sessions", authHandler.HandleGetSessions)
 		r.Delete("/auth/sessions", authHandler.HandleLogoutAllDevices)
 		r.Delete("/auth/sessions/{sessionId}", authHandler.HandleLogoutSpecificDevice)
+
+		// Address management routes
+		r.Post("/addresses", addressHandler.HandleCreate)
+		r.Get("/addresses", addressHandler.HandleList)
+		r.Get("/addresses/{id}", addressHandler.HandleGetByID)
+		r.Put("/addresses/{id}", addressHandler.HandleUpdate)
+		r.Delete("/addresses/{id}", addressHandler.HandleDelete)
+		r.Put("/addresses/{id}/set-default", addressHandler.HandleSetDefault)
 	})
 
 	// Admin routes

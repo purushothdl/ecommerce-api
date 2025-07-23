@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/purushothdl/ecommerce-api/internal/models"
+	"github.com/purushothdl/ecommerce-api/internal/shared/dto"
 )
 
 // UserService handles user business logic
@@ -62,3 +63,12 @@ type CartService interface {
 	HandleLoginWithTransaction(ctx context.Context, q *Queries, userID int64, anonymousCartID int64) error
 }
 
+// AddressService handles user address operations
+type AddressService interface {
+    Create(ctx context.Context, userID int64, req *dto.CreateAddressRequest) (*models.UserAddress, error)
+    GetByID(ctx context.Context, id int64, userID int64) (*models.UserAddress, error)
+    ListByUserID(ctx context.Context, userID int64) ([]*models.UserAddress, error)
+    Update(ctx context.Context, userID int64, id int64, req *dto.UpdateAddressRequest) (*models.UserAddress, error)
+    Delete(ctx context.Context, userID int64, id int64) error
+    SetDefault(ctx context.Context, userID int64, id int64, req string) error
+}

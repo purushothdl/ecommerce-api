@@ -87,7 +87,7 @@ Follow these instructions to get the project up and running on your local machin
 ### Prerequisites
 
 -   Go 1.21+
--   PostgreSQL 14+
+-   PostgreSQL 15+
 -   `make` (optional, for convenience)
 -   [golang-migrate CLI](https://github.com/golang-migrate/migrate/tree/master/cmd/migrate)
 
@@ -183,7 +183,18 @@ The server will start on `http://localhost:8080`.
 | `DELETE` | `/api/v1/users/account`   | Delete the authenticated user's account.         | User   |
 | `GET`    | `/api/v1/auth/sessions`   | View all active sessions for the user.           | User   |
 | `DELETE` | `/api/v1/auth/sessions`   | Log out from all devices (revoke all sessions).  | User   |
-| `DELETE` | `/api/v1/auth/sessions/{id}` | Log out from a specific session.                | User   |
+| `DELETE` | `/api/v1/auth/sessions/{sessionId}` | Log out from a specific session.                | User   |
+
+### Address Management
+
+| Method   | Endpoint                          | Description                                      | Access |
+| :------- | :-------------------------------- | :----------------------------------------------- | :----- |
+| `POST`   | `/api/v1/addresses`              | Create a new address.                            | User   |
+| `GET`    | `/api/v1/addresses`              | List all addresses for the user.                 | User   |
+| `GET`    | `/api/v1/addresses/{id}`         | Get details for a specific address.              | User   |
+| `PUT`    | `/api/v1/addresses/{id}`         | Update an address.                               | User   |
+| `DELETE` | `/api/v1/addresses/{id}`         | Delete an address.                               | User   |
+| `PUT`    | `/api/v1/addresses/{id}/set-default` | Set an address as default shipping/billing.    | User   |
 
 ### Products & Categories
 

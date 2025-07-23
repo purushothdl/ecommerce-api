@@ -14,14 +14,16 @@ import (
 
 type cartService struct {
 	cartRepo    domain.CartRepository
-	productRepo domain.ProductRepository 
+	productRepo domain.ProductRepository
+	store       domain.Store
 	logger      *slog.Logger
 }
 
-func NewCartService(cartRepo domain.CartRepository, productRepo domain.ProductRepository, logger *slog.Logger) domain.CartService {
+func NewCartService(cartRepo domain.CartRepository, productRepo domain.ProductRepository, store domain.Store, logger *slog.Logger) domain.CartService {
 	return &cartService{
 		cartRepo:    cartRepo,
 		productRepo: productRepo,
+		store:       store,
 		logger:      logger,
 	}
 }
@@ -79,63 +81,54 @@ func (s *cartService) GetOrCreateCart(ctx context.Context, userID *int64, anonym
 }
 
 func (s *cartService) AddProductToCart(ctx context.Context, cartID int64, productID int64, quantity int) (*models.Cart, error) {
-	s.logger.Info("adding product to cart", "cart_id", cartID, "product_id", productID, "quantity", quantity)
+	s.logger.Info("adding product to cart within transaction", "cart_id", cartID, "product_id", productID, "quantity", quantity)
 
-	// Check product stock
-	product, err := s.productRepo.GetByID(ctx, productID)
+	err := s.store.ExecTx(ctx, func(q *domain.Queries) error {
+		return q.CartRepo.AddItem(ctx, cartID, productID, quantity)
+	})
+
 	if err != nil {
-		s.logger.Warn("attempted to add non-existent product to cart", "product_id", productID)
-		return nil, apperrors.ErrNotFound
-	}
-	if product.StockQuantity < quantity {
-		s.logger.Warn("not enough stock to add to cart", "product_id", productID, "stock", product.StockQuantity, "requested", quantity)
-		return nil, apperrors.ErrInsufficientStock 
-	}
-
-	if err := s.cartRepo.AddItem(ctx, cartID, productID, quantity); err != nil {
-		s.logger.Error("failed to add item to cart repo", "cart_id", cartID, "product_id", productID, "error", err)
+		// The error from the repository (e.g., ErrInsufficientStock) will be passed up
+		s.logger.Warn("failed to add item to cart", "error", err)
 		return nil, err
 	}
 
-	cart, err := s.cartRepo.GetByID(ctx, cartID)
-	if err != nil {
-		return nil, err
-	}
-	return s.getCartWithItems(ctx, cart)
+	return s.GetCartContents(ctx, cartID)
 }
 
 func (s *cartService) UpdateProductInCart(ctx context.Context, cartID int64, productID int64, quantity int) (*models.Cart, error) {
-	s.logger.Info("updating product in cart", "cart_id", cartID, "product_id", productID, "new_quantity", quantity)
+	s.logger.Info("updating product in cart within transaction", "cart_id", cartID, "product_id", productID, "new_quantity", quantity)
 
 	if quantity <= 0 {
+		// Removing an item can also be done in a transaction for consistency
 		return s.RemoveProductFromCart(ctx, cartID, productID)
 	}
 
-	if err := s.cartRepo.UpdateItemQuantity(ctx, cartID, productID, quantity); err != nil {
-		s.logger.Error("failed to update item in cart repo", "cart_id", cartID, "product_id", productID, "error", err)
+	err := s.store.ExecTx(ctx, func(q *domain.Queries) error {
+		return q.CartRepo.UpdateItemQuantity(ctx, cartID, productID, quantity)
+	})
+
+	if err != nil {
+		s.logger.Error("failed to update item in cart", "error", err)
 		return nil, err
 	}
 	
-	cart, err := s.cartRepo.GetByID(ctx, cartID)
-	if err != nil {
-		return nil, err
-	}
-	return s.getCartWithItems(ctx, cart)
+	return s.GetCartContents(ctx, cartID)
 }
 
 func (s *cartService) RemoveProductFromCart(ctx context.Context, cartID int64, productID int64) (*models.Cart, error) {
-	s.logger.Info("removing product from cart", "cart_id", cartID, "product_id", productID)
+	s.logger.Info("removing product from cart within transaction", "cart_id", cartID, "product_id", productID)
 
-	if err := s.cartRepo.RemoveItem(ctx, cartID, productID); err != nil {
-		s.logger.Error("failed to remove item from cart repo", "cart_id", cartID, "product_id", productID, "error", err)
-		return nil, err
-	}
+	err := s.store.ExecTx(ctx, func(q *domain.Queries) error {
+		return q.CartRepo.RemoveItem(ctx, cartID, productID)
+	})
 
-	cart, err := s.cartRepo.GetByID(ctx, cartID)
 	if err != nil {
+		s.logger.Error("failed to remove item from cart", "error", err)
 		return nil, err
 	}
-	return s.getCartWithItems(ctx, cart)
+
+	return s.GetCartContents(ctx, cartID)
 }
 
 func (s *cartService) GetCartContents(ctx context.Context, cartID int64) (*models.Cart, error) {
@@ -148,7 +141,6 @@ func (s *cartService) GetCartContents(ctx context.Context, cartID int64) (*model
 	return s.getCartWithItems(ctx, cart)
 }
 
-// Add to internal/cart/service.go
 func (s *cartService) HandleLoginWithTransaction(ctx context.Context, q *domain.Queries, userID int64, anonymousCartID int64) error {
     if anonymousCartID == 0 {
         return nil 
@@ -165,9 +157,9 @@ func (s *cartService) HandleLoginWithTransaction(ctx context.Context, q *domain.
             return fmt.Errorf("failed to get user cart: %w", err)
         }
     }
-
+	// Same cart, nothing to merge
     if userCart.ID == anonymousCartID {
-        return nil // Same cart, nothing to merge
+        return nil 
     }
 
     // Merge carts

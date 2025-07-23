@@ -22,6 +22,7 @@ type Server struct {
 	categoryService domain.CategoryService
 	cartService     domain.CartService
 	store 			domain.Store
+	addressService  domain.AddressService
 	isProduction    bool 
 }
 
@@ -36,6 +37,7 @@ func New(
 	categoryService domain.CategoryService,
 	cartService     domain.CartService,	
 	store 			domain.Store,
+	addressService  domain.AddressService,
 
 ) *Server {
 	s := &Server{
@@ -48,7 +50,8 @@ func New(
 		productService:  productService,
 		categoryService: categoryService,
 		cartService:     cartService,
-		store: 			store,
+		store: 			 store,
+		addressService:  addressService,
 		isProduction:    config.Env == "production", 
 	}
 
