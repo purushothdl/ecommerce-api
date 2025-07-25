@@ -207,3 +207,19 @@ func (r *cartRepository) CleanupOldAnonymousCartItems(ctx context.Context, older
     _, err := r.db.ExecContext(ctx, fmt.Sprintf(query, olderThanDays))
     return err
 }
+
+func (r *cartRepository) ClearCart(ctx context.Context, cartID int64) error {
+	query := `DELETE FROM cart_items WHERE cart_id = $1`
+	_, err := r.db.ExecContext(ctx, query, cartID)
+	if err != nil {
+		return fmt.Errorf("cart repo: failed to clear cart items: %w", err)
+	}
+
+	updateQuery := `UPDATE carts SET updated_at = NOW() WHERE id = $1`
+	_, err = r.db.ExecContext(ctx, updateQuery, cartID)
+	if err != nil {
+		return fmt.Errorf("cart repo: failed to update cart timestamp after clearing: %w", err)
+	}
+
+	return nil
+}

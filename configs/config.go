@@ -19,6 +19,7 @@ type Config struct {
 	Server   ServerConfig
 	Timeouts TimeoutConfig
 	CORS     CORSConfig
+	Stripe   StripeConfig
 }
 
 type DBConfig struct {
@@ -57,6 +58,11 @@ type CORSConfig struct {
 	ExposeHeaders    []string
 	AllowCredentials bool
 	MaxAge           int
+}
+
+type StripeConfig struct {
+	SecretKey      string
+	WebhookSecret  string
 }
 
 func LoadConfig() (*Config, error) {
@@ -106,6 +112,10 @@ func LoadConfig() (*Config, error) {
 			ExposeHeaders:    strings.Split(getEnv("CORS_EXPOSE_HEADERS", ""), ","),
 			AllowCredentials: getEnvAsBool("CORS_ALLOW_CREDENTIALS", true),
 			MaxAge:           getEnvAsInt("CORS_MAX_AGE", 86400),
+		},
+		Stripe: StripeConfig{
+			SecretKey:     getEnv("STRIPE_SECRET_KEY", ""),
+			WebhookSecret: getEnv("STRIPE_WEBHOOK_SECRET", ""),
 		},
 	}
 

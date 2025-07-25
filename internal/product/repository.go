@@ -120,3 +120,51 @@ func (r *productRepository) GetAll(ctx context.Context, filters domain.ProductFi
 
 	return products, nil
 }
+
+
+func (r *productRepository) GetByIDForUpdate(ctx context.Context, id int64) (*models.Product, error) {
+    // Note the "FOR UPDATE" clause which locks the selected row until the transaction is committed.
+	query := `
+        SELECT id, name, description, price, stock_quantity, category_id, brand, sku,
+               images, thumbnail, dimensions, warranty_information, created_at, updated_at, version
+        FROM products
+        WHERE id = $1 FOR UPDATE`
+
+	var p models.Product
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&p.ID, &p.Name, &p.Description, &p.Price, &p.StockQuantity, &p.CategoryID, &p.Brand, &p.SKU,
+		&p.Images, &p.Thumbnail, &p.Dimensions, &p.WarrantyInformation, &p.CreatedAt, &p.UpdatedAt, &p.Version,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, apperrors.ErrNotFound
+		}
+		return nil, fmt.Errorf("product repository: failed to get product for update: %w", err)
+	}
+
+	return &p, nil
+}
+
+func (r *productRepository) UpdateStock(ctx context.Context, productID int64, quantityChange int) error {
+    // This query atomically updates the stock quantity.
+    query := `
+        UPDATE products
+        SET stock_quantity = stock_quantity + $1, updated_at = NOW()
+        WHERE id = $2`
+
+    result, err := r.db.ExecContext(ctx, query, quantityChange, productID)
+    if err != nil {
+        return fmt.Errorf("product repository: failed to update stock: %w", err)
+    }
+
+    rowsAffected, err := result.RowsAffected()
+    if err != nil {
+        return fmt.Errorf("product repository: failed to get rows affected: %w", err)
+    }
+
+    if rowsAffected == 0 {
+        return apperrors.ErrNotFound 
+    }
+
+    return nil
+}

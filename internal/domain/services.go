@@ -72,3 +72,14 @@ type AddressService interface {
     Delete(ctx context.Context, userID int64, id int64) error
     SetDefault(ctx context.Context, userID int64, id int64, req string) error
 }
+
+// OrderService handles order business logic
+type OrderService interface {
+	CreateOrder(ctx context.Context, userID int64, cartID int64, req *dto.CreateOrderRequest) (*models.PaymentIntent, error)
+	HandlePaymentSucceeded(ctx context.Context, paymentIntentID string) error
+}
+
+// PaymentService defines the interface for a payment provider like Stripe.
+type PaymentService interface {
+	CreatePaymentIntent(ctx context.Context, amount float64) (*models.PaymentIntent, error)
+}

@@ -2,11 +2,14 @@
 package server
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/purushothdl/ecommerce-api/internal/address"
 	"github.com/purushothdl/ecommerce-api/internal/admin"
 	"github.com/purushothdl/ecommerce-api/internal/auth"
 	"github.com/purushothdl/ecommerce-api/internal/cart"
+	"github.com/purushothdl/ecommerce-api/internal/order"
 	"github.com/purushothdl/ecommerce-api/internal/product"
 	"github.com/purushothdl/ecommerce-api/internal/shared/middleware"
 	"github.com/purushothdl/ecommerce-api/internal/user"
@@ -19,14 +22,18 @@ func (s *Server) registerRoutes() {
 	productHandler := product.NewHandler(s.productService, s.categoryService, s.logger)
 	cartHandler := cart.NewHandler(s.cartService, s.logger)
 	addressHandler := address.NewHandler(s.addressService, s.logger)
+	orderHandler := order.NewHandler(s.orderService, s.config.Stripe, s.logger)
 
+	fileServer := http.FileServer(http.Dir("./static/"))
+    s.router.Handle("/*", fileServer)
+	
 	// API versioning
 	s.router.Route("/api/v1", func(r chi.Router) {
-		s.registerV1Routes(r, userHandler, authHandler, adminHandler, productHandler, cartHandler, addressHandler)
+		s.registerV1Routes(r, userHandler, authHandler, adminHandler, productHandler, cartHandler, addressHandler, orderHandler)
 	})
 }
 
-func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authHandler *auth.Handler, adminHandler *admin.Handler, productHandler *product.Handler, cartHandler *cart.Handler, addressHandler *address.Handler) {
+func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authHandler *auth.Handler, adminHandler *admin.Handler, productHandler *product.Handler, cartHandler *cart.Handler, addressHandler *address.Handler, orderHandler *order.Handler) {
 	// Auth routes
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.TimeoutMiddleware(s.config.Timeouts.Auth))
@@ -40,6 +47,9 @@ func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authH
 		r.Use(middleware.TimeoutMiddleware(s.config.Timeouts.UserOps))
 		r.Post("/users", userHandler.HandleRegister)
 	})
+
+	// Add the public webhook route - it must NOT have auth middleware
+	r.Post("/webhooks/stripe", orderHandler.HandleStripeWebhook)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
@@ -64,6 +74,10 @@ func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authH
 		r.Put("/addresses/{id}", addressHandler.HandleUpdate)
 		r.Delete("/addresses/{id}", addressHandler.HandleDelete)
 		r.Put("/addresses/{id}/set-default", addressHandler.HandleSetDefault)
+
+		
+		// Order creation route
+		r.With(middleware.CartMiddleware(s.cartService, s.isProduction)).Post("/orders", orderHandler.HandleCreateOrder)
 	})
 
 	// Admin routes

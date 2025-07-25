@@ -9,6 +9,7 @@ import (
 	"github.com/purushothdl/ecommerce-api/internal/auth"
 	"github.com/purushothdl/ecommerce-api/internal/cart"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
+	"github.com/purushothdl/ecommerce-api/internal/order"
 	"github.com/purushothdl/ecommerce-api/internal/product"
 	"github.com/purushothdl/ecommerce-api/internal/user"
 )
@@ -40,6 +41,7 @@ func (s *sqlStore) ExecTx(ctx context.Context, fn func(q *domain.Queries) error)
         ProductRepo: product.NewProductRepository(tx),
         AuthRepo:    auth.NewAuthRepository(tx),
         AddressRepo: address.NewAddressRepository(tx),
+        OrderRepo:   order.NewOrderRepository(tx),
     }
 
     // Execute the callback, passing our single Queries object.

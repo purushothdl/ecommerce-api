@@ -2,6 +2,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -9,7 +10,6 @@ import (
 
 	"slices"
 )
-
 
 // DefaultCORSConfig returns default CORS configuration
 func DefaultCORSConfig() configs.CORSConfig {
@@ -38,53 +38,77 @@ func DefaultCORSConfig() configs.CORSConfig {
 
 // CORSMiddleware creates CORS middleware with configuration
 func CORSMiddleware(config ...configs.CORSConfig) func(http.Handler) http.Handler {
-	cfg := DefaultCORSConfig()
-	if len(config) > 0 {
-		cfg = config[0]
-	}
+    cfg := DefaultCORSConfig()
+    if len(config) > 0 {
+        cfg = config[0]
+    }
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			origin := r.Header.Get("Origin")
-			
-			// Set CORS headers
-			if len(cfg.AllowOrigins) > 0 {
-				if cfg.AllowOrigins[0] == "*" {
-					w.Header().Set("Access-Control-Allow-Origin", "*")
-				} else {
-					if slices.Contains(cfg.AllowOrigins, origin) {
-							w.Header().Set("Access-Control-Allow-Origin", origin)
-						}
-				}
-			}
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            origin := r.Header.Get("Origin")
+            
+            // Always set Access-Control-Allow-Origin
+            if len(cfg.AllowOrigins) > 0 {
+                if cfg.AllowOrigins[0] == "*" {
+                    w.Header().Set("Access-Control-Allow-Origin", "*")
+                } else if slices.Contains(cfg.AllowOrigins, origin) {
+                    w.Header().Set("Access-Control-Allow-Origin", origin)
+                } else {
+                    w.Header().Set("Access-Control-Allow-Origin", cfg.AllowOrigins[0])
+                }
+            }
 
-			if len(cfg.AllowMethods) > 0 {
-				w.Header().Set("Access-Control-Allow-Methods", strings.Join(cfg.AllowMethods, ", "))
-			}
+            // Set other CORS headers
+            if len(cfg.AllowMethods) > 0 {
+                w.Header().Set("Access-Control-Allow-Methods", strings.Join(cfg.AllowMethods, ", "))
+            }
 
-			if len(cfg.AllowHeaders) > 0 {
-				w.Header().Set("Access-Control-Allow-Headers", strings.Join(cfg.AllowHeaders, ", "))
-			}
+            if len(cfg.AllowHeaders) > 0 {
+                w.Header().Set("Access-Control-Allow-Headers", strings.Join(cfg.AllowHeaders, ", "))
+            }
 
-			if len(cfg.ExposeHeaders) > 0 {
-				w.Header().Set("Access-Control-Expose-Headers", strings.Join(cfg.ExposeHeaders, ", "))
-			}
+            if len(cfg.ExposeHeaders) > 0 && cfg.ExposeHeaders[0] != "" {
+                w.Header().Set("Access-Control-Expose-Headers", strings.Join(cfg.ExposeHeaders, ", "))
+            }
 
-			if cfg.AllowCredentials {
-				w.Header().Set("Access-Control-Allow-Credentials", "true")
-			}
+            if cfg.AllowCredentials {
+                w.Header().Set("Access-Control-Allow-Credentials", "true")
+            }
 
-			if cfg.MaxAge > 0 {
-				w.Header().Set("Access-Control-Max-Age", string(rune(cfg.MaxAge)))
-			}
+            if cfg.MaxAge > 0 {
+                w.Header().Set("Access-Control-Max-Age", fmt.Sprintf("%d", cfg.MaxAge))
+            }
 
-			// Handle preflight requests
-			if r.Method == http.MethodOptions {
-				w.WriteHeader(http.StatusOK)
-				return
-			}
+			fmt.Printf("CORS Headers Set:\n")
+			fmt.Printf("  Origin: %s\n", w.Header().Get("Access-Control-Allow-Origin"))
+			fmt.Printf("  Methods: %s\n", w.Header().Get("Access-Control-Allow-Methods"))
+			fmt.Printf("  Headers: %s\n", w.Header().Get("Access-Control-Allow-Headers"))
+			fmt.Printf("  Credentials: %s\n", w.Header().Get("Access-Control-Allow-Credentials"))
 
-			next.ServeHTTP(w, r)
-		})
-	}
+            // Handle preflight requests
+            if r.Method == http.MethodOptions {
+                w.WriteHeader(http.StatusNoContent) 
+                return
+            }
+
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+
+func DevCORS(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Access-Control-Allow-Origin", "http://localhost:8000")
+        w.Header().Set("Access-Control-Allow-Credentials", "true")
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, X-CSRF-Token")
+        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        w.Header().Set("Access-Control-Max-Age", "86400")
+        w.Header().Set("Vary", "Origin")
+
+        if r.Method == http.MethodOptions {
+            w.WriteHeader(http.StatusNoContent)
+            return
+        }
+        next.ServeHTTP(w, r)
+    })
 }

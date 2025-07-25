@@ -134,26 +134,26 @@ func (r *orderRepository) GetByUserID(ctx context.Context, userID int64) ([]*mod
     return orders, nil
 }
 
-func (r *orderRepository) UpdateStatus(ctx context.Context, id int64, status models.OrderStatus) error {
-    query := `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`
-    res, err := r.db.ExecContext(ctx, query, status, id)
-    if err != nil {
-        return fmt.Errorf("failed to update order status: %w", err)
-    }
-    if rows, _ := res.RowsAffected(); rows == 0 {
-        return apperrors.ErrNotFound
-    }
-    return nil
+func (r *orderRepository) GetByPaymentIntentID(ctx context.Context, paymentIntentID string) (*models.Order, error) {
+	query := `SELECT id, user_id, status, payment_status FROM orders WHERE payment_intent_id = $1`
+	order := &models.Order{}
+	err := r.db.QueryRowContext(ctx, query, paymentIntentID).Scan(&order.ID, &order.UserID, &order.Status, &order.PaymentStatus)
+	if err == sql.ErrNoRows {
+		return nil, apperrors.ErrNotFound
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to get order by payment_intent_id: %w", err)
+	}
+	return order, nil
 }
 
-func (r *orderRepository) UpdatePaymentStatus(ctx context.Context, id int64, status models.PaymentStatus) error {
-    query := `UPDATE orders SET payment_status = $1, updated_at = NOW() WHERE id = $2`
-    res, err := r.db.ExecContext(ctx, query, status, id)
-    if err != nil {
-        return fmt.Errorf("failed to update payment status: %w", err)
-    }
-    if rows, _ := res.RowsAffected(); rows == 0 {
-        return apperrors.ErrNotFound
-    }
-    return nil
+func (r *orderRepository) UpdateStatus(ctx context.Context, id int64, status models.OrderStatus, paymentStatus models.PaymentStatus) error {
+	query := `UPDATE orders SET status = $1, payment_status = $2, updated_at = NOW() WHERE id = $3`
+	res, err := r.db.ExecContext(ctx, query, status, paymentStatus, id)
+	if err != nil {
+		return fmt.Errorf("failed to update order status: %w", err)
+	}
+	if rows, _ := res.RowsAffected(); rows == 0 {
+		return apperrors.ErrNotFound
+	}
+	return nil
 }

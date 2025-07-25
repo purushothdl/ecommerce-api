@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Payment Test</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 500px; margin: auto; }
+        #card-element { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+        button { width: 100%; padding: 10px; background: #007cba; color: white; border: none; cursor: pointer; }
+        button:disabled { background: #ccc; }
+        pre { background: #f0f0f0; padding: 10px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+
+<h2>Test Payment</h2>
+
+<p><strong>Amount:</strong> $9.10 USD</p>
+<p><strong>Payment Intent ID:</strong> pi_3RoUmFR46uEaqwG62b8HYzmz</p>
+
+<div id="card-element"></div>
+<button id="payBtn">Pay $9.10</button>
+
+<pre id="result"></pre>
+
+<script>
+    // Replace with your Stripe publishable key
+    const stripe = Stripe('pk_test_51Rnkq5R46uEaqwG6CtNpRugqjJ76lEcxlqcUU8n4v1cepDUbcWFYrC73gnAjPVx2xwzzleFsNx8MjxcdNiESvscX00DmRepAcZ');
+    
+    // The client_secret from your API response
+    const clientSecret = 'pi_3RoUmFR46uEaqwG62b8HYzmz_secret_OgLQ9BINmUQoKeoZXrBcH334z';
+    
+    const elements = stripe.elements();
+    const cardElement = elements.create('card');
+    cardElement.mount('#card-element');
+    
+    document.getElementById('payBtn').addEventListener('click', async () => {
+        document.getElementById('result').textContent = 'Processing...';
+        
+        const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+            payment_method: {
+                card: cardElement,
+                billing_details: {
+                    name: 'John Doe',
+                }
+            }
+        });
+        
+        if (error) {
+            document.getElementById('result').textContent = `❌ Payment failed: ${error.message}`;
+        } else {
+            document.getElementById('result').textContent = `🎉 Payment successful!
+Payment Intent ID: ${paymentIntent.id}
+Status: ${paymentIntent.status}
+Amount: $${(paymentIntent.amount / 100).toFixed(2)}`;
+        }
+    });
+</script>
+
+</body>
+</html>

@@ -23,6 +23,8 @@ type Server struct {
 	cartService     domain.CartService
 	store 			domain.Store
 	addressService  domain.AddressService
+	orderService    domain.OrderService
+	paymentService  domain.PaymentService
 	isProduction    bool 
 }
 
@@ -38,6 +40,8 @@ func New(
 	cartService     domain.CartService,	
 	store 			domain.Store,
 	addressService  domain.AddressService,
+	orderService    domain.OrderService,
+	paymentService  domain.PaymentService,
 
 ) *Server {
 	s := &Server{
@@ -52,13 +56,15 @@ func New(
 		cartService:     cartService,
 		store: 			 store,
 		addressService:  addressService,
+		orderService:    orderService,
+		paymentService:  paymentService,
 		isProduction:    config.Env == "production", 
 	}
 
 	// Apply global middleware in order
 	s.router.Use(middleware.RecoveryMiddleware(logger))
 	s.router.Use(middleware.LoggingMiddleware(logger))
-	s.router.Use(middleware.CORSMiddleware(config.CORS))
+	// s.router.Use(middleware.CORSMiddleware(config.CORS))
 
 	s.registerRoutes()
 	return s

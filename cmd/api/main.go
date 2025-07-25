@@ -20,6 +20,8 @@ import (
 	"github.com/purushothdl/ecommerce-api/internal/category"
 	"github.com/purushothdl/ecommerce-api/internal/database"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
+	"github.com/purushothdl/ecommerce-api/internal/order"
+	"github.com/purushothdl/ecommerce-api/internal/payment"
 	"github.com/purushothdl/ecommerce-api/internal/product"
 	"github.com/purushothdl/ecommerce-api/internal/server"
 	"github.com/purushothdl/ecommerce-api/internal/user"
@@ -36,6 +38,8 @@ type application struct {
 	store 			domain.Store
 	cartService     domain.CartService
 	addressService  domain.AddressService
+	orderService    domain.OrderService
+	paymentService  domain.PaymentService
 }
 
 func main() {
@@ -79,6 +83,7 @@ func run() error {
 	addressRepo := address.NewAddressRepository(db)
 
 	// Setup services (implement domain interfaces)
+	paymentService := payment.NewStripeService(cfg.Stripe) 
 	cartService := cart.NewCartService(cartRepo, productRepo, store, logger)
 	authService := auth.NewAuthService(authRepo, userRepo, cartService, cfg.JWT.Secret, logger)
 	userService := user.NewUserService(userRepo, authService, cartService, logger)	
@@ -86,6 +91,7 @@ func run() error {
 	categoryService := category.NewCategoryService(categoryRepo, logger)
 	productService := product.NewProductService(productRepo, logger)
 	addressService := address.NewAddressService(addressRepo, store, logger)
+	orderService := order.NewOrderService(store, paymentService, logger)
 
 	app := &application{
 		config:          cfg,
@@ -98,6 +104,8 @@ func run() error {
 		store: 			 store,
 		cartService:     cartService,
 		addressService:  addressService,
+		orderService:    orderService,
+		paymentService:  paymentService,
 	}
 
 	// Start server
@@ -110,7 +118,7 @@ func (app *application) startServer() error {
 		Handler: server.New(
 			app.config, app.logger, app.userService, app.authService,
 			app.adminService, app.productService, app.categoryService,
-			app.cartService, app.store, app.addressService,
+			app.cartService, app.store, app.addressService, app.orderService, app.paymentService,
 		).Router(),
 		ReadTimeout:  app.config.Server.ReadTimeout,
 		WriteTimeout: app.config.Server.WriteTimeout,
