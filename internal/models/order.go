@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // OrderStatus represents the possible states of an order
 type OrderStatus string
@@ -46,8 +49,8 @@ type Order struct {
     PaymentStatus         PaymentStatus  `json:"payment_status"`
     PaymentMethod         string         `json:"payment_method"`
     PaymentIntentID       string         `json:"payment_intent_id,omitempty"`
-    ShippingAddress       OrderAddress   `json:"shipping_address" gorm:"type:jsonb"`
-    BillingAddress        OrderAddress   `json:"billing_address" gorm:"type:jsonb"`
+    ShippingAddress       json.RawMessage `json:"shipping_address"` 
+    BillingAddress        json.RawMessage `json:"billing_address"`
     Subtotal              float64        `json:"subtotal"`
     TaxAmount             float64        `json:"tax_amount"`
     ShippingCost          float64        `json:"shipping_cost"`

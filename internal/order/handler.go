@@ -14,8 +14,8 @@ import (
 	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
 	"github.com/purushothdl/ecommerce-api/pkg/response"
 	"github.com/purushothdl/ecommerce-api/pkg/validator"
-	"github.com/stripe/stripe-go/v78"
-	"github.com/stripe/stripe-go/v78/webhook"
+	"github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/webhook"
 )
 
 type Handler struct {

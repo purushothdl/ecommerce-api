@@ -6,10 +6,23 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/cors"
 	"github.com/purushothdl/ecommerce-api/configs"
 
 	"slices"
 )
+
+// This is the recommended, production-ready middleware.
+func ChiCors(cfg configs.CORSConfig) func(http.Handler) http.Handler {
+	return cors.New(cors.Options{
+		AllowedOrigins:   cfg.AllowOrigins,
+		AllowedMethods:   cfg.AllowMethods,
+		AllowedHeaders:   cfg.AllowHeaders,
+		ExposedHeaders:   cfg.ExposeHeaders,
+		AllowCredentials: cfg.AllowCredentials,
+		MaxAge:           cfg.MaxAge,
+	}).Handler
+}
 
 // DefaultCORSConfig returns default CORS configuration
 func DefaultCORSConfig() configs.CORSConfig {
@@ -32,7 +45,7 @@ func DefaultCORSConfig() configs.CORSConfig {
 		},
 		ExposeHeaders:    []string{},
 		AllowCredentials: true,
-		MaxAge:           86400, // 24 hours
+		MaxAge:           86400, 
 	}
 }
 

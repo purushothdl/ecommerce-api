@@ -7,8 +7,8 @@ import (
 	"github.com/purushothdl/ecommerce-api/configs"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	"github.com/purushothdl/ecommerce-api/internal/models"
-	"github.com/stripe/stripe-go/v78"
-	"github.com/stripe/stripe-go/v78/paymentintent"
+	"github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/paymentintent"
 )
 
 // stripeService doesn't need to hold a client instance.

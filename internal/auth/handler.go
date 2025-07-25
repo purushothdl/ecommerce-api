@@ -45,6 +45,11 @@ func NewHandler(
 	}
 }
 
+func (h *Handler) HandleWelcome(w http.ResponseWriter, r *http.Request) {
+	resp := response.MessageResponse{Message: "Welcome to the Go E-Commerce API!"}
+	response.JSON(w, http.StatusOK, resp)
+}
+
 // HandleLogin authenticates user and returns access/refresh tokens
 func (h *Handler) HandleLogin(w http.ResponseWriter, r *http.Request) {
     var input CreateTokenRequest

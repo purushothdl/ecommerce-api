@@ -2,19 +2,12 @@ package dto
 
 // CreateOrderRequest represents the input for creating an order
 type CreateOrderRequest struct {
-    Items               []OrderItemRequest `json:"items"`
-    ShippingAddressID   *int64             `json:"shipping_address_id,omitempty"`
-    BillingAddressID    *int64             `json:"billing_address_id,omitempty"`
-    ShippingAddress     *OrderAddress      `json:"shipping_address,omitempty"`
-    BillingAddress      *OrderAddress      `json:"billing_address,omitempty"`
-    PaymentMethod       string             `json:"payment_method" example:"stripe"`
+    ShippingAddressID  int64  `json:"shipping_address_id"`
+    BillingAddressID   int64  `json:"billing_address_id"`
+    PaymentMethod      string `json:"payment_method" example:"stripe"`
 }
 
-// OrderItemRequest represents a single item in the order request
-type OrderItemRequest struct {
-    ProductID int64 `json:"product_id"`
-    Quantity  int   `json:"quantity"`
-}
+
 
 // ConfirmPaymentRequest represents the input for confirming payment
 type ConfirmPaymentRequest struct {

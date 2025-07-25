@@ -64,7 +64,7 @@ func New(
 	// Apply global middleware in order
 	s.router.Use(middleware.RecoveryMiddleware(logger))
 	s.router.Use(middleware.LoggingMiddleware(logger))
-	// s.router.Use(middleware.CORSMiddleware(config.CORS))
+	s.router.Use(middleware.ChiCors(s.config.CORS))
 
 	s.registerRoutes()
 	return s

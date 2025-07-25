@@ -2,8 +2,6 @@
 package server
 
 import (
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/purushothdl/ecommerce-api/internal/address"
 	"github.com/purushothdl/ecommerce-api/internal/admin"
@@ -24,13 +22,11 @@ func (s *Server) registerRoutes() {
 	addressHandler := address.NewHandler(s.addressService, s.logger)
 	orderHandler := order.NewHandler(s.orderService, s.config.Stripe, s.logger)
 
-	fileServer := http.FileServer(http.Dir("./static/"))
-    s.router.Handle("/*", fileServer)
-	
 	// API versioning
 	s.router.Route("/api/v1", func(r chi.Router) {
 		s.registerV1Routes(r, userHandler, authHandler, adminHandler, productHandler, cartHandler, addressHandler, orderHandler)
-	})
+	})	
+	
 }
 
 func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authHandler *auth.Handler, adminHandler *admin.Handler, productHandler *product.Handler, cartHandler *cart.Handler, addressHandler *address.Handler, orderHandler *order.Handler) {
@@ -48,8 +44,9 @@ func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authH
 		r.Post("/users", userHandler.HandleRegister)
 	})
 
-	// Add the public webhook route - it must NOT have auth middleware
+	// Public webhook route - it must NOT have auth middleware
 	r.Post("/webhooks/stripe", orderHandler.HandleStripeWebhook)
+	r.Get("/", authHandler.HandleWelcome)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
