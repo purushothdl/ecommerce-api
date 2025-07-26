@@ -11,7 +11,7 @@ import (
 	"github.com/purushothdl/ecommerce-api/internal/models"
 	"github.com/purushothdl/ecommerce-api/internal/shared/dto"
 	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors" 
-	"github.com/purushothdl/ecommerce-api/pkg/utils/order_number"
+	"github.com/purushothdl/ecommerce-api/pkg/utils/orders"
 )
 
 type orderService struct {
@@ -29,19 +29,6 @@ func NewOrderService(store domain.Store, paymentService domain.PaymentService, l
 	}
 }
 
-// Helper function to convert a models.UserAddress to a models.OrderAddress (JSONB snapshot)
-func toOrderAddress(addr *models.UserAddress) models.OrderAddress {
-	return models.OrderAddress{
-		Name:       addr.Name,
-		Phone:      addr.Phone,
-		Street1:    addr.Street1,
-		Street2:    addr.Street2,
-		City:       addr.City,
-		State:      addr.State,
-		PostalCode: addr.PostalCode,
-		Country:    addr.Country,
-	}
-}
 
 // CreateOrder handles the entire process of creating an order.
 func (s *orderService) CreateOrder(ctx context.Context, userID int64, cartID int64, req *dto.CreateOrderRequest) (*models.PaymentIntent, error) {
@@ -103,12 +90,12 @@ func (s *orderService) CreateOrder(ctx context.Context, userID int64, cartID int
 
 		// 5. Create the main Order record.
         // Marshal address structs to JSONB
-        shippingJSON, _ := json.Marshal(toOrderAddress(shippingAddr))
-        billingJSON, _ := json.Marshal(toOrderAddress(billingAddr))
+        shippingJSON, _ := json.Marshal(orders.ToOrderAddress(shippingAddr))
+        billingJSON, _ := json.Marshal(orders.ToOrderAddress(billingAddr))
 
 		order := &models.Order{
 			UserID:          userID,
-			OrderNumber:     order_number.Generate(),
+			OrderNumber:     orders.Generate(),
 			Status:          models.OrderStatusPendingPayment,
 			PaymentStatus:   models.PaymentStatusPending,
 			PaymentMethod:   req.PaymentMethod,
@@ -178,5 +165,103 @@ func (s *orderService) HandlePaymentSucceeded(ctx context.Context, paymentIntent
 		
 		s.logger.Info("updating order status to confirmed/paid", "order_id", order.ID, "pi_id", paymentIntentID)
 		return q.OrderRepo.UpdateStatus(ctx, order.ID, models.OrderStatusConfirmed, models.PaymentStatusPaid)
+	})
+}
+
+// ListUserOrders retrieves all orders for a given user.
+func (s *orderService) ListUserOrders(ctx context.Context, userID int64) ([]*dto.OrderResponse, error) {
+	var orders []*models.Order
+	var orderDTOs []*dto.OrderResponse
+
+	err := s.store.ExecTx(ctx, func(q *domain.Queries) error {
+		var txErr error
+		orders, txErr = q.OrderRepo.GetByUserID(ctx, userID)
+		return txErr
+	})
+
+	if err != nil {
+		s.logger.Error("failed to list user orders", "user_id", userID, "error", err)
+		return nil, err
+	}
+
+	// Map the database models to the response DTOs
+	for _, order := range orders {
+		orderDTOs = append(orderDTOs, &dto.OrderResponse{
+			ID:            order.ID,
+			OrderNumber:   order.OrderNumber,
+			Status:        order.Status,
+			PaymentStatus: order.PaymentStatus,
+			TotalAmount:   order.TotalAmount,
+			CreatedAt:     order.CreatedAt,
+		})
+	}
+
+	return orderDTOs, nil
+}
+
+// GetUserOrder retrieves a single detailed order for a user.
+func (s *orderService) GetUserOrder(ctx context.Context, userID, orderID int64) (*dto.OrderWithItemsResponse, error) {
+	var order *models.Order
+	var items []*models.OrderItem
+
+	err := s.store.ExecTx(ctx, func(q *domain.Queries) error {
+		var txErr error
+		// The repo method enforces that the userID matches the order.
+		order, txErr = q.OrderRepo.GetByID(ctx, orderID, userID)
+		if txErr != nil {
+			return txErr // Propagates ErrNotFound if order doesn't exist or doesn't belong to user
+		}
+
+		items, txErr = q.OrderRepo.GetItemsByOrderID(ctx, orderID)
+		return txErr
+	})
+
+	if err != nil {
+		s.logger.Error("failed to get user order details", "user_id", userID, "order_id", orderID, "error", err)
+		return nil, err
+	}
+
+	// Map the database models to our detailed DTO.
+	return dto.MapModelsToOrderWithItemsResponse(order, items), nil
+}
+
+// CancelOrder cancels an order, refunds the payment, and restocks items.
+func (s *orderService) CancelOrder(ctx context.Context, userID, orderID int64) error {
+	return s.store.ExecTx(ctx, func(q *domain.Queries) error {
+		// 1. Get the order and lock the row for update.
+		// This also implicitly checks if the order belongs to the user.
+		order, err := q.OrderRepo.GetByIDForUpdate(ctx, orderID, userID)
+		if err != nil {
+			return err // Will be ErrNotFound if not found or no permission
+		}
+
+		// 2. Business Rule: Check if the order is in a cancellable state.
+		if order.Status != models.OrderStatusConfirmed && order.Status != models.OrderStatusProcessing {
+			s.logger.Warn("attempt to cancel order with non-cancellable status", "order_id", order.ID, "status", order.Status)
+			return fmt.Errorf("order cannot be cancelled. status: %s", order.Status)
+		}
+
+		// 3. Issue the refund via the payment service.
+		if err := s.paymentService.RefundPaymentIntent(ctx, order.PaymentIntentID); err != nil {
+			s.logger.Error("failed to refund payment intent during cancellation", "order_id", order.ID, "pi_id", order.PaymentIntentID, "error", err)
+			return fmt.Errorf("payment refund failed: %w", err)
+		}
+
+		// 4. Get order items to restock them.
+		items, err := q.OrderRepo.GetItemsByOrderID(ctx, order.ID)
+		if err != nil {
+			return fmt.Errorf("failed to get order items for restocking: %w", err)
+		}
+
+		// 5. Restock each product.
+		for _, item := range items {
+			if err := q.ProductRepo.UpdateStock(ctx, item.ProductID, +item.Quantity); err != nil {
+				return fmt.Errorf("failed to restock product %d: %w", item.ProductID, err)
+			}
+		}
+
+		// 6. Update the order status to cancelled and payment status to refunded.
+		s.logger.Info("order cancelled and refunded successfully", "order_id", order.ID)
+		return q.OrderRepo.UpdateStatus(ctx, order.ID, models.OrderStatusCancelled, models.PaymentStatusRefunded)
 	})
 }

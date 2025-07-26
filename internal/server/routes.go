@@ -73,8 +73,11 @@ func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authH
 		r.Put("/addresses/{id}/set-default", addressHandler.HandleSetDefault)
 
 		
-		// Order creation route
+		// Order management routes
 		r.With(middleware.CartMiddleware(s.cartService, s.isProduction)).Post("/orders", orderHandler.HandleCreateOrder)
+		r.Get("/orders", orderHandler.HandleListUserOrders)                     
+		r.Get("/orders/{orderId}", orderHandler.HandleGetUserOrder)             
+		r.Post("/orders/{orderId}/cancel", orderHandler.HandleCancelOrder) 
 	})
 
 	// Admin routes

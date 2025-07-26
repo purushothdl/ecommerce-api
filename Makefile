@@ -1,5 +1,5 @@
 # Makefile
-.PHONY: migrateup migratedown run hashtest seed
+.PHONY: migrateup migratedown run hashtest seed test-payment
 
 # Load environment variables from .env file
 include .env
@@ -27,3 +27,7 @@ hashtest:
 seed:
 	@echo "Seeding database..."
 	@go run ./cmd/seed/
+
+test-payment:
+	@echo "Starting test payment server..."
+	python -m http.server --directory static 8000

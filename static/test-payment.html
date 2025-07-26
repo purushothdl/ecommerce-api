@@ -16,20 +16,20 @@
 
 <h2>Test Payment</h2>
 
-<p><strong>Amount:</strong> $46.4</p>
+<p><strong>Amount:</strong> $159.98</p>
 <p><strong>Payment Intent ID:</strong> Client Secret</p>
 
 <div id="card-element"></div>
-<button id="payBtn">Pay $9.10</button>
+<button id="payBtn">Pay $159.98</button>
 
 <pre id="result"></pre>
 
 <script>
     // Replace with your Stripe publishable key
-    const stripe = Stripe('publishable_test_key');
+    const stripe = Stripe('publishable_key');
     
     // The client_secret from your API response
-    const clientSecret = 'client_secret';
+    const clientSecret = 'secret_key';
     
     const elements = stripe.elements();
     const cardElement = elements.create('card');

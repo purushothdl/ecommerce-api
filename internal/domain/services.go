@@ -77,9 +77,13 @@ type AddressService interface {
 type OrderService interface {
 	CreateOrder(ctx context.Context, userID int64, cartID int64, req *dto.CreateOrderRequest) (*models.PaymentIntent, error)
 	HandlePaymentSucceeded(ctx context.Context, paymentIntentID string) error
+	ListUserOrders(ctx context.Context, userID int64) ([]*dto.OrderResponse, error) 
+	GetUserOrder(ctx context.Context, userID, orderID int64) (*dto.OrderWithItemsResponse, error) 
+	CancelOrder(ctx context.Context, userID, orderID int64) error 
 }
 
 // PaymentService defines the interface for a payment provider like Stripe.
 type PaymentService interface {
 	CreatePaymentIntent(ctx context.Context, amount float64) (*models.PaymentIntent, error)
+	RefundPaymentIntent(ctx context.Context, paymentIntentID string) error
 }

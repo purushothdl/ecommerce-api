@@ -79,6 +79,7 @@ type OrderRepository interface {
     Create(ctx context.Context, order *models.Order) error
     CreateItems(ctx context.Context, items []*models.OrderItem) error
     GetByID(ctx context.Context, id int64, userID int64) (*models.Order, error)
+	GetByIDForUpdate(ctx context.Context, id int64, userID int64) (*models.Order, error)
     GetItemsByOrderID(ctx context.Context, orderID int64) ([]*models.OrderItem, error)
     GetByUserID(ctx context.Context, userID int64) ([]*models.Order, error)
 

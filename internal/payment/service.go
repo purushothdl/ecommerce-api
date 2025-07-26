@@ -7,6 +7,7 @@ import (
 	"github.com/purushothdl/ecommerce-api/configs"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	"github.com/purushothdl/ecommerce-api/internal/models"
+	"github.com/stripe/stripe-go/v82/refund"
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/paymentintent"
 )
@@ -47,4 +48,19 @@ func (s *stripeService) CreatePaymentIntent(ctx context.Context, amount float64)
 		Currency:     string(pi.Currency),
 		Status:       string(pi.Status),
 	}, nil
+}
+
+// RefundPaymentIntent issues a full refund for a given Payment Intent.
+func (s *stripeService) RefundPaymentIntent(ctx context.Context, paymentIntentID string) error {
+	params := &stripe.RefundParams{
+		PaymentIntent: stripe.String(paymentIntentID),
+	}
+
+	_, err := refund.New(params)
+	if err != nil {
+		// Check for specific Stripe errors if needed
+		return fmt.Errorf("failed to create stripe refund: %w", err)
+	}
+
+	return nil
 }

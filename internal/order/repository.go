@@ -157,3 +157,25 @@ func (r *orderRepository) UpdateStatus(ctx context.Context, id int64, status mod
 	}
 	return nil
 }
+
+func (r *orderRepository) GetByIDForUpdate(ctx context.Context, id int64, userID int64) (*models.Order, error) {
+	// Note the "FOR UPDATE" clause
+	query := `
+        SELECT id, user_id, order_number, status, payment_status, payment_method, payment_intent_id,
+               shipping_address, billing_address, subtotal, tax_amount, shipping_cost, discount_amount, total_amount,
+               notes, tracking_number, estimated_delivery_date, created_at, updated_at
+        FROM orders WHERE id = $1 AND user_id = $2 FOR UPDATE
+    `
+	order := &models.Order{}
+	err := r.db.QueryRowContext(ctx, query, id, userID).Scan(
+		&order.ID, &order.UserID, &order.OrderNumber, &order.Status, &order.PaymentStatus, &order.PaymentMethod, &order.PaymentIntentID,
+		&order.ShippingAddress, &order.BillingAddress, &order.Subtotal, &order.TaxAmount, &order.ShippingCost, &order.DiscountAmount, &order.TotalAmount,
+		&order.Notes, &order.TrackingNumber, &order.EstimatedDeliveryDate, &order.CreatedAt, &order.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, apperrors.ErrNotFound
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to get order for update: %w", err)
+	}
+	return order, nil
+}
