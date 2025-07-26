@@ -1,0 +1,25 @@
+# Dockerfile.mega-worker
+
+# ---- Build Stage ----
+FROM golang:1.24.2-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# Build the mega-worker binary.
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/mega-worker -ldflags="-w -s" ./cmd/mega-worker
+
+# ---- Final Stage ----
+FROM gcr.io/distroless/static-debian12
+
+WORKDIR /app
+
+COPY --from=builder /app/bin/mega-worker /app/bin/mega-worker
+
+EXPOSE 8081
+
+CMD ["/app/bin/mega-worker"]

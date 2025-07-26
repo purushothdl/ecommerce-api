@@ -4,6 +4,7 @@ package domain
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/purushothdl/ecommerce-api/internal/models"
 )
@@ -82,9 +83,10 @@ type OrderRepository interface {
 	GetByIDForUpdate(ctx context.Context, id int64, userID int64) (*models.Order, error)
     GetItemsByOrderID(ctx context.Context, orderID int64) ([]*models.OrderItem, error)
     GetByUserID(ctx context.Context, userID int64) ([]*models.Order, error)
+	GetOrderByID(ctx context.Context, id int64) (*models.Order, error) 
 
 	GetByPaymentIntentID(ctx context.Context, paymentIntentID string) (*models.Order, error)
-	UpdateStatus(ctx context.Context, id int64, status models.OrderStatus, paymentStatus models.PaymentStatus) error
+	UpdateStatus(ctx context.Context,id int64,status models.OrderStatus,paymentStatus models.PaymentStatus,trackingNumber *string, estimatedDeliveryDate *time.Time) error
 }
 
 type DBTX interface {

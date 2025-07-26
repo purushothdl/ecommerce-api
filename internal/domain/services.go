@@ -3,6 +3,7 @@ package domain
 
 import (
 	"context"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/purushothdl/ecommerce-api/internal/models"
@@ -75,15 +76,16 @@ type AddressService interface {
 
 // OrderService handles order business logic
 type OrderService interface {
-	CreateOrder(ctx context.Context, userID int64, cartID int64, req *dto.CreateOrderRequest) (*models.PaymentIntent, error)
+	CreateOrder(ctx context.Context, userID int64, cartID int64, req *dto.CreateOrderRequest) (*dto.CreateOrderResponse, error)
 	HandlePaymentSucceeded(ctx context.Context, paymentIntentID string) error
 	ListUserOrders(ctx context.Context, userID int64) ([]*dto.OrderResponse, error) 
 	GetUserOrder(ctx context.Context, userID, orderID int64) (*dto.OrderWithItemsResponse, error) 
 	CancelOrder(ctx context.Context, userID, orderID int64) error 
+	UpdateOrderStatus(ctx context.Context, orderID int64, status models.OrderStatus, paymentStatus *models.PaymentStatus, trackingNumber *string, estimatedDeliveryDate *time.Time,) error
 }
 
 // PaymentService defines the interface for a payment provider like Stripe.
 type PaymentService interface {
-	CreatePaymentIntent(ctx context.Context, amount float64) (*models.PaymentIntent, error)
+	CreatePaymentIntent(ctx context.Context, amount float64) (*dto.PaymentIntent, error)
 	RefundPaymentIntent(ctx context.Context, paymentIntentID string) error
 }

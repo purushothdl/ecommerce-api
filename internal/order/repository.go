@@ -1,13 +1,14 @@
 package order
 
 import (
-    "context"
-    "database/sql"
-    "fmt"
+	"context"
+	"database/sql"
+	"fmt"
+	"time"
 
-    "github.com/purushothdl/ecommerce-api/internal/domain"
-    "github.com/purushothdl/ecommerce-api/internal/models"
-    apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
+	"github.com/purushothdl/ecommerce-api/internal/domain"
+	"github.com/purushothdl/ecommerce-api/internal/models"
+	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
 )
 
 type orderRepository struct {
@@ -135,9 +136,9 @@ func (r *orderRepository) GetByUserID(ctx context.Context, userID int64) ([]*mod
 }
 
 func (r *orderRepository) GetByPaymentIntentID(ctx context.Context, paymentIntentID string) (*models.Order, error) {
-	query := `SELECT id, user_id, status, payment_status FROM orders WHERE payment_intent_id = $1`
+	query := `SELECT id, user_id, status, payment_status, total_amount FROM orders WHERE payment_intent_id = $1`
 	order := &models.Order{}
-	err := r.db.QueryRowContext(ctx, query, paymentIntentID).Scan(&order.ID, &order.UserID, &order.Status, &order.PaymentStatus)
+	err := r.db.QueryRowContext(ctx, query, paymentIntentID).Scan(&order.ID, &order.UserID, &order.Status, &order.PaymentStatus, &order.TotalAmount)
 	if err == sql.ErrNoRows {
 		return nil, apperrors.ErrNotFound
 	} else if err != nil {
@@ -146,17 +147,50 @@ func (r *orderRepository) GetByPaymentIntentID(ctx context.Context, paymentInten
 	return order, nil
 }
 
-func (r *orderRepository) UpdateStatus(ctx context.Context, id int64, status models.OrderStatus, paymentStatus models.PaymentStatus) error {
-	query := `UPDATE orders SET status = $1, payment_status = $2, updated_at = NOW() WHERE id = $3`
-	res, err := r.db.ExecContext(ctx, query, status, paymentStatus, id)
-	if err != nil {
-		return fmt.Errorf("failed to update order status: %w", err)
+func (r *orderRepository) UpdateStatus(
+	ctx context.Context,
+	id int64,
+	status models.OrderStatus,
+	paymentStatus models.PaymentStatus,
+	trackingNumber *string,
+	estimatedDeliveryDate *time.Time, 
+) error {
+	query := `UPDATE orders SET status = $1, payment_status = $2, updated_at = NOW()`
+	args := []interface{}{status, paymentStatus}
+	placeholder := 3
+
+	if trackingNumber != nil {
+		query += fmt.Sprintf(", tracking_number = $%d", placeholder)
+		args = append(args, *trackingNumber)
+		placeholder++
 	}
-	if rows, _ := res.RowsAffected(); rows == 0 {
-		return apperrors.ErrNotFound
+
+	if estimatedDeliveryDate != nil { 
+		query += fmt.Sprintf(", estimated_delivery_date = $%d", placeholder)
+		args = append(args, *estimatedDeliveryDate)
+		placeholder++
 	}
-	return nil
+
+	query += fmt.Sprintf(" WHERE id = $%d", placeholder)
+	args = append(args, id)
+
+	res, err := r.db.ExecContext(ctx, query, args...)
+    if err != nil {
+        return fmt.Errorf("failed to update order status: %w", err)
+    }
+
+    rows, err := res.RowsAffected()
+    if err != nil {
+        return fmt.Errorf("failed to fetch affected rows: %w", err)
+    }
+
+    if rows == 0 {
+        return apperrors.ErrNotFound
+    }
+
+    return nil
 }
+
 
 func (r *orderRepository) GetByIDForUpdate(ctx context.Context, id int64, userID int64) (*models.Order, error) {
 	// Note the "FOR UPDATE" clause
@@ -176,6 +210,19 @@ func (r *orderRepository) GetByIDForUpdate(ctx context.Context, id int64, userID
 		return nil, apperrors.ErrNotFound
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to get order for update: %w", err)
+	}
+	return order, nil
+}
+
+// GetOrderByID retrieves an order by its ID, without checking the user. For internal use.
+func (r *orderRepository) GetOrderByID(ctx context.Context, id int64) (*models.Order, error) {
+	query := `SELECT id, user_id, payment_status FROM orders WHERE id = $1`
+	order := &models.Order{}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(&order.ID, &order.UserID, &order.PaymentStatus)
+	if err == sql.ErrNoRows {
+		return nil, apperrors.ErrNotFound
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to get order by ID: %w", err)
 	}
 	return order, nil
 }

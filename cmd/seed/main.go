@@ -14,7 +14,7 @@ import (
 
 func main() {
 	// 1. Load configuration
-	cfg, err := configs.LoadConfig()
+	cfg, err := configs.LoadConfig("api.env")
 	if err != nil {
 		log.Fatalf("failed to load configuration: %v", err)
 	}

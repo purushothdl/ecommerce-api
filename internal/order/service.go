@@ -6,33 +6,43 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
+	"github.com/purushothdl/ecommerce-api/configs"
+	"github.com/purushothdl/ecommerce-api/events"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	"github.com/purushothdl/ecommerce-api/internal/models"
 	"github.com/purushothdl/ecommerce-api/internal/shared/dto"
-	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors" 
+	"github.com/purushothdl/ecommerce-api/internal/shared/tasks"
+	apperrors "github.com/purushothdl/ecommerce-api/pkg/errors"
+	"github.com/purushothdl/ecommerce-api/pkg/utils/jsonutil"
 	"github.com/purushothdl/ecommerce-api/pkg/utils/orders"
+	"github.com/purushothdl/ecommerce-api/pkg/utils/timeutil"
 )
 
 type orderService struct {
 	store          domain.Store
 	paymentService domain.PaymentService 
+	taskCreator    *tasks.TaskCreator
 	logger         *slog.Logger
+	config         configs.OrderFinancialsConfig
 }
 
 // NewOrderService creates a new OrderService
-func NewOrderService(store domain.Store, paymentService domain.PaymentService, logger *slog.Logger) domain.OrderService {
+func NewOrderService(store domain.Store, paymentService domain.PaymentService, taskCreator *tasks.TaskCreator, logger *slog.Logger, config configs.OrderFinancialsConfig) domain.OrderService {
 	return &orderService{
 		store:          store,
 		paymentService: paymentService,
+		taskCreator:    taskCreator, 
 		logger:         logger,
+		config:         config,
 	}
 }
 
 
 // CreateOrder handles the entire process of creating an order.
-func (s *orderService) CreateOrder(ctx context.Context, userID int64, cartID int64, req *dto.CreateOrderRequest) (*models.PaymentIntent, error) {
-	var paymentIntent *models.PaymentIntent
+func (s *orderService) CreateOrder(ctx context.Context, userID int64, cartID int64, req *dto.CreateOrderRequest) (*dto.CreateOrderResponse, error) {
+	var response *dto.CreateOrderResponse
 
 	err := s.store.ExecTx(ctx, func(q *domain.Queries) error {
 		// 1. Get cart items from the user's cart in context.
@@ -78,8 +88,13 @@ func (s *orderService) CreateOrder(ctx context.Context, userID int64, cartID int
 			productSnapshots[item.Product.ID] = product
 		}
 
-		// TODO: Add tax and shipping calculation logic here
-		totalAmount := subtotal
+		// Calculate tax, shipping, and discount amounts
+		taxAmount := subtotal * s.config.OrderTaxRate
+		shippingCost := s.config.OrderShippingCost
+		discountAmount := s.config.OrderDiscountAmount
+        
+        // Calculate total amount
+        totalAmount := max(subtotal + taxAmount + shippingCost - discountAmount, 0)
 
 		// 4. Create Stripe Payment Intent.
 		stripePI, err := s.paymentService.CreatePaymentIntent(ctx, totalAmount)
@@ -93,17 +108,23 @@ func (s *orderService) CreateOrder(ctx context.Context, userID int64, cartID int
         shippingJSON, _ := json.Marshal(orders.ToOrderAddress(shippingAddr))
         billingJSON, _ := json.Marshal(orders.ToOrderAddress(billingAddr))
 
+		defaultEDD := timeutil.CalculateEDD(time.Now(), 4)
+		
 		order := &models.Order{
-			UserID:          userID,
-			OrderNumber:     orders.Generate(),
-			Status:          models.OrderStatusPendingPayment,
-			PaymentStatus:   models.PaymentStatusPending,
-			PaymentMethod:   req.PaymentMethod,
-			PaymentIntentID: stripePI.ID,
-			Subtotal:        subtotal,
-			TotalAmount:     totalAmount,
-			ShippingAddress: json.RawMessage(shippingJSON),
-			BillingAddress:  json.RawMessage(billingJSON),
+			UserID:                userID,
+			OrderNumber:           orders.Generate(),
+			Status:                models.OrderStatusPendingPayment,
+			PaymentStatus:         models.PaymentStatusPending,
+			PaymentMethod:         req.PaymentMethod,
+			PaymentIntentID:       stripePI.ID,
+			Subtotal:              subtotal,
+			TaxAmount:             taxAmount,
+			ShippingCost:          shippingCost,
+			DiscountAmount:        discountAmount,
+			TotalAmount:           totalAmount,
+			ShippingAddress:       json.RawMessage(shippingJSON),
+			BillingAddress:        json.RawMessage(billingJSON),
+			EstimatedDeliveryDate: defaultEDD,
 		}
 		if err := q.OrderRepo.Create(ctx, order); err != nil {
 			s.logger.Error("failed to save order", "error", err)
@@ -142,30 +163,110 @@ func (s *orderService) CreateOrder(ctx context.Context, userID int64, cartID int
 		}
 
 		// 8. Set the response object to be returned by the outer function.
-		paymentIntent = stripePI
+		response = &dto.CreateOrderResponse{
+			OrderID:      order.ID,
+			OrderNumber:  order.OrderNumber,
+			ClientSecret: stripePI.ClientSecret,
+		}
 		return nil
 	})
 
-	return paymentIntent, err
+	return response, err
 }
 
 
 func (s *orderService) HandlePaymentSucceeded(ctx context.Context, paymentIntentID string) error {
-	return s.store.ExecTx(ctx, func(q *domain.Queries) error {
-		order, err := q.OrderRepo.GetByPaymentIntentID(ctx, paymentIntentID)
-		if err != nil {
+	var order *models.Order
+	var user *models.User
+	var orderItems []*models.OrderItem
+
+	// The transaction ensures we only create the task if the DB update succeeds.
+	// We also fetch all necessary data for our events inside this transaction for consistency.
+	err := s.store.ExecTx(ctx, func(q *domain.Queries) error {
+		var txErr error
+		order, txErr = q.OrderRepo.GetByPaymentIntentID(ctx, paymentIntentID)
+		if txErr != nil {
 			s.logger.Error("webhook cannot find order for payment intent", "pi_id", paymentIntentID)
-			return err
+			return txErr
 		}
 
 		if order.PaymentStatus == models.PaymentStatusPaid {
 			s.logger.Info("webhook received for already-paid order, ignoring", "order_id", order.ID)
 			return nil
 		}
-		
+
+		// Fetch the user to get their email for the notification.
+		user, txErr = q.UserRepo.GetByID(ctx, order.UserID)
+		if txErr != nil {
+			s.logger.Error("failed to get user for task creation", "user_id", order.UserID)
+			return txErr
+		}
+
+		// CRITICAL FIX: Fetch the order items associated with this order.
+		orderItems, txErr = q.OrderRepo.GetItemsByOrderID(ctx, order.ID)
+		if txErr != nil {
+			s.logger.Error("failed to get order items for event", "order_id", order.ID)
+			return txErr
+		}
+
 		s.logger.Info("updating order status to confirmed/paid", "order_id", order.ID, "pi_id", paymentIntentID)
-		return q.OrderRepo.UpdateStatus(ctx, order.ID, models.OrderStatusConfirmed, models.PaymentStatusPaid)
+		// We pass nil for tracking and EDD as they are not available yet.
+		return q.OrderRepo.UpdateStatus(ctx, order.ID, models.OrderStatusConfirmed, models.PaymentStatusPaid, nil, nil)
 	})
+
+	if err != nil {
+		return err
+	}
+
+	// This happens *after* the transaction has successfully committed.
+	if order != nil && user != nil {
+
+		// The address is stored as JSON in the order, so we unmarshal it.
+		var orderShippingAddress events.OrderAddressInfo
+		if err := json.Unmarshal(order.ShippingAddress, &orderShippingAddress); err != nil {
+			s.logger.Error("failed to unmarshal shipping address for event", "order_id", order.ID, "error", err)
+			// We still attempt to send the fulfillment task even if address parsing fails for the email.
+		}
+
+		// Map database order items to the event's OrderItemInfo struct.
+		// This now works because 'orderItems' was populated inside the transaction.
+		eventItems := make([]events.OrderItemInfo, len(orderItems))
+		for i, item := range orderItems {
+			eventItems[i] = events.OrderItemInfo{
+				ProductName: item.ProductName,
+				Quantity:    item.Quantity,
+				UnitPrice:   item.UnitPrice,
+			}
+		}
+
+		// FULFILLMENT TASK
+		fulfillmentEvent := events.OrderCreatedEvent{
+			OrderID:         order.ID,
+			OrderNumber:     order.OrderNumber,
+			UserID:          order.UserID,
+			UserEmail:       user.Email,
+			TotalAmount:     order.TotalAmount,
+			OrderDate:       order.CreatedAt,
+			Items:           eventItems,
+			ShippingAddress: orderShippingAddress,
+		}
+
+		if err := s.taskCreator.CreateFulfillmentTask(ctx, "/handle/order-created", fulfillmentEvent); err != nil {
+			s.logger.Error("CRITICAL: failed to enqueue order fulfillment task", "order_id", order.ID, "error", err)
+		}
+
+		// NOTIFICATION TASK
+		notificationEvent := events.NotificationRequestEvent{
+			Type:      "ORDER_CONFIRMED",
+			UserEmail: user.Email,
+			Payload:   jsonutil.MustMarshal(fulfillmentEvent),
+		}
+		if err := s.taskCreator.CreateFulfillmentTask(ctx, "/handle/notification-request", notificationEvent); err != nil {
+			s.logger.Error("CRITICAL: failed to enqueue order confirmed notification task", "order_id", order.ID, "error", err)
+		}
+	}
+
+	return nil
 }
 
 // ListUserOrders retrieves all orders for a given user.
@@ -262,6 +363,31 @@ func (s *orderService) CancelOrder(ctx context.Context, userID, orderID int64) e
 
 		// 6. Update the order status to cancelled and payment status to refunded.
 		s.logger.Info("order cancelled and refunded successfully", "order_id", order.ID)
-		return q.OrderRepo.UpdateStatus(ctx, order.ID, models.OrderStatusCancelled, models.PaymentStatusRefunded)
+		return q.OrderRepo.UpdateStatus(ctx, order.ID, models.OrderStatusCancelled, models.PaymentStatusRefunded, nil, nil)
+	})
+}
+
+func (s *orderService) UpdateOrderStatus(
+    ctx context.Context,
+    orderID int64,
+    status models.OrderStatus,
+    paymentStatus *models.PaymentStatus,
+    trackingNumber *string, 
+	estimatedDeliveryDate *time.Time,
+) error {
+	return s.store.ExecTx(ctx, func(q *domain.Queries) error {
+		order, err := q.OrderRepo.GetOrderByID(ctx, orderID)
+		if err != nil {
+			return err
+		}
+		
+		finalPaymentStatus := order.PaymentStatus
+		if paymentStatus != nil {
+			finalPaymentStatus = *paymentStatus
+		}
+		
+		s.logger.Info("Updating order status via internal call", "order_id", orderID, "new_status", status)
+		
+		return q.OrderRepo.UpdateStatus(ctx, order.ID, status, finalPaymentStatus, trackingNumber, estimatedDeliveryDate)
 	})
 }

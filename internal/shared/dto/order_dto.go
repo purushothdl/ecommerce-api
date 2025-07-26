@@ -14,6 +14,13 @@ type CreateOrderRequest struct {
     PaymentMethod      string `json:"payment_method" example:"stripe"`
 }
 
+// CreateOrderResponse is the specific data returned after successfully creating an order.
+type CreateOrderResponse struct {
+	OrderID      int64  `json:"order_id"`
+	OrderNumber  string `json:"order_number"`
+	ClientSecret string `json:"client_secret"` 
+}
+
 // ConfirmPaymentRequest represents the input for confirming payment
 type ConfirmPaymentRequest struct {
     PaymentIntentID string `json:"payment_intent_id"`
@@ -22,6 +29,14 @@ type ConfirmPaymentRequest struct {
 // CancelOrderRequest represents the input for cancelling an order (if needed, e.g., with reason)
 type CancelOrderRequest struct {
     Reason string `json:"reason,omitempty"`
+}
+
+// UpdateOrderStatusRequest is the payload for the internal status update endpoint.
+type UpdateOrderStatusRequest struct {
+	Status                models.OrderStatus    `json:"status"`
+	PaymentStatus         *models.PaymentStatus `json:"payment_status,omitempty"`
+	TrackingNumber        *string               `json:"tracking_number,omitempty"`
+	EstimatedDeliveryDate *time.Time           ` json:"estimated_delivery_date,omitempty"`
 }
 
 // OrderResponse represents a single order output, used in lists

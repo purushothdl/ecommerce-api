@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Order Shipped</title>
+    <style>
+        body { font-family: sans-serif; }
+        strong { color: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>Good news! Your order has shipped!</h1>
+    <p>Your order #{{.OrderNumber}} is on its way to you.</p>
+    <p>
+        Tracking Number: <strong>{{.TrackingNumber}}</strong>
+    </p>
+    <p>
+        Estimated Delivery Date: <strong>{{.EstimatedDeliveryDate | formatAsDate}}</strong>
+    </p>
+    <p>You can use the tracking number on the carrier's website to follow your package's journey.</p>
+</body>
+</html>

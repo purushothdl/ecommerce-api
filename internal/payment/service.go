@@ -6,10 +6,10 @@ import (
 
 	"github.com/purushothdl/ecommerce-api/configs"
 	"github.com/purushothdl/ecommerce-api/internal/domain"
-	"github.com/purushothdl/ecommerce-api/internal/models"
-	"github.com/stripe/stripe-go/v82/refund"
+	"github.com/purushothdl/ecommerce-api/internal/shared/dto"
 	"github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/paymentintent"
+	"github.com/stripe/stripe-go/v82/refund"
 )
 
 // stripeService doesn't need to hold a client instance.
@@ -23,13 +23,13 @@ func NewStripeService(cfg configs.StripeConfig) domain.PaymentService {
 }
 
 // CreatePaymentIntent creates a payment intent on Stripe.
-func (s *stripeService) CreatePaymentIntent(ctx context.Context, amount float64) (*models.PaymentIntent, error) {
+func (s *stripeService) CreatePaymentIntent(ctx context.Context, amount float64) (*dto.PaymentIntent, error) {
 	// Stripe expects the amount in the smallest currency unit (e.g., cents).
-	amountInCents := int64(amount * 100)
+	amountInPaise := int64(amount * 100)
 
 	params := &stripe.PaymentIntentParams{
-		Amount:   stripe.Int64(amountInCents),
-		Currency: stripe.String(string(stripe.CurrencyUSD)), 
+		Amount:   stripe.Int64(amountInPaise),
+		Currency: stripe.String(string(stripe.CurrencyINR)), 
 		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
 			Enabled: stripe.Bool(true),
 		},
@@ -41,7 +41,7 @@ func (s *stripeService) CreatePaymentIntent(ctx context.Context, amount float64)
 	}
 
 	// Map the Stripe response to our internal model.
-	return &models.PaymentIntent{
+	return &dto.PaymentIntent{
 		ID:           pi.ID,
 		ClientSecret: pi.ClientSecret,
 		Amount:       amount,

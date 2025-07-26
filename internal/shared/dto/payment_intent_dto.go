@@ -1,6 +1,4 @@
-package models
-
-import "time"
+package dto
 
 // PaymentIntent represents a Stripe payment intent record
 type PaymentIntent struct {
@@ -10,6 +8,4 @@ type PaymentIntent struct {
     Currency     string    `json:"currency"`
     Status       string    `json:"status"`
     ClientSecret string    `json:"client_secret"`
-    CreatedAt    time.Time `json:"created_at"`
-    UpdatedAt    time.Time `json:"updated_at"`
 }

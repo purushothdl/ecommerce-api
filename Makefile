@@ -2,7 +2,7 @@
 .PHONY: migrateup migratedown run hashtest seed test-payment
 
 # Load environment variables from .env file
-include .env
+include api.env
 export
 
 # Use the DB_DSN directly if it's already a valid PostgreSQL URL
@@ -30,4 +30,4 @@ seed:
 
 test-payment:
 	@echo "Starting test payment server..."
-	python -m http.server --directory static 8000
+	python -m http.server --directory static 8005

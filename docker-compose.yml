@@ -1,0 +1,23 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # Main API Server Service
+  api:
+    build:
+      context: .  # The context is the whole project directory
+      dockerfile: Dockerfile.api # Use this specific Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - api.env # Use the api-specific environment file
+
+  # Mega Worker Service
+  mega-worker:
+    build:
+      context: . # The context is also the whole project directory
+      dockerfile: Dockerfile.mega-worker # Use this specific Dockerfile
+    ports:
+      - "8081:8081"
+    env_file:
+      - worker.env # Use the worker-specific environment file

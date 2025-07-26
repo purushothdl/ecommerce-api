@@ -1,0 +1,44 @@
+# Dockerfile.api
+
+# ---- Build Stage ----
+# Use an official Go image as the builder.
+# Pinning the version ensures reproducible builds.
+FROM golang:1.24.2-alpine AS builder
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy go.mod and go.sum files to download dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the rest of the application source code
+COPY . .
+
+# Build the API server binary.
+# -o specifies the output file path.
+# CGO_ENABLED=0 creates a statically linked binary.
+# -ldflags="-w -s" strips debugging information, making the binary smaller.
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/api -ldflags="-w -s" ./cmd/api
+
+# ---- Final Stage ----
+# Use a minimal, non-root base image for the final container.
+# "distroless" is from Google and contains only the application and its runtime dependencies.
+# It's more secure as it doesn't even have a shell.
+FROM gcr.io/distroless/static-debian12
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the compiled binary from the builder stage
+COPY --from=builder /app/bin/api /app/bin/api
+
+# Copy migrations and .env.example (useful for reference, but .env will be injected)
+COPY migrations ./migrations
+COPY .env.example ./.env.example
+
+# Expose the port the application will run on
+EXPOSE 8080
+
+# The command to run when the container starts
+CMD ["/app/bin/api"]

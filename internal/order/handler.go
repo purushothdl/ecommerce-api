@@ -192,3 +192,32 @@ func (h *Handler) HandleCancelOrder(w http.ResponseWriter, r *http.Request) {
 
 	response.JSON(w, http.StatusOK, response.MessageResponse{Message: "Order cancelled and refunded successfully."})
 }
+
+
+// HandleUpdateOrderStatus is an internal-only endpoint for workers to update order status.
+func (h *Handler) HandleUpdateOrderStatus(w http.ResponseWriter, r *http.Request) {
+	orderIDStr := chi.URLParam(r, "orderId")
+	orderID, err := strconv.ParseInt(orderIDStr, 10, 64)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid order ID")
+		return
+	}
+
+	var req dto.UpdateOrderStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.Error(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if err := h.orderService.UpdateOrderStatus(r.Context(), orderID, req.Status, req.PaymentStatus, req.TrackingNumber, req.EstimatedDeliveryDate,); err != nil {
+		if errors.Is(err, apperrors.ErrNotFound) {
+			response.Error(w, http.StatusNotFound, "Order not found")
+		} else {
+			h.logger.Error("failed to update order status internally", "order_id", orderID, "error", err)
+			response.Error(w, http.StatusInternalServerError, "Could not update order status")
+		}
+		return
+	}
+
+	response.JSON(w, http.StatusOK, response.MessageResponse{Message: "Order status updated successfully."})
+}

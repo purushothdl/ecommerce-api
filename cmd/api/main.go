@@ -24,6 +24,7 @@ import (
 	"github.com/purushothdl/ecommerce-api/internal/payment"
 	"github.com/purushothdl/ecommerce-api/internal/product"
 	"github.com/purushothdl/ecommerce-api/internal/server"
+	"github.com/purushothdl/ecommerce-api/internal/shared/tasks"
 	"github.com/purushothdl/ecommerce-api/internal/user"
 )
 
@@ -54,10 +55,27 @@ func run() error {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil)) 
 	
 	// Load configuration
-	cfg, err := configs.LoadConfig()
+	cfg, err := configs.LoadConfig("api.env")
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
+
+	// Initialize Cloud Tasks Client
+	tasksClient, err := tasks.NewClient(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to create tasks client: %w", err)
+	}
+	defer tasksClient.Close()
+
+	taskCreatorCfg := tasks.TaskCreatorConfig{
+		ProjectID:      cfg.GCTasks.ProjectID,
+		LocationID:     cfg.GCTasks.LocationID,
+		QueueID:        cfg.GCTasks.QueueID,
+		WorkerURL:      cfg.GCTasks.WorkerURL,
+		ServiceAccount: cfg.GCTasks.ServiceAccount,
+	}
+
+	taskCreator := tasks.NewTaskCreator(tasksClient, taskCreatorCfg, logger)
 
 	// Initialize database
 	db, err := database.NewPostgres(cfg.DB)
@@ -91,7 +109,7 @@ func run() error {
 	categoryService := category.NewCategoryService(categoryRepo, logger)
 	productService := product.NewProductService(productRepo, logger)
 	addressService := address.NewAddressService(addressRepo, store, logger)
-	orderService := order.NewOrderService(store, paymentService, logger)
+	orderService := order.NewOrderService(store, paymentService, taskCreator, logger, cfg.OrderFinancials)
 
 	app := &application{
 		config:          cfg,

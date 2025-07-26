@@ -48,6 +48,12 @@ func (s *Server) registerV1Routes(r chi.Router, userHandler *user.Handler, authH
 	r.Post("/webhooks/stripe", orderHandler.HandleStripeWebhook)
 	r.Get("/", authHandler.HandleWelcome)
 
+	// Internal-only routes
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.OIDCAuthMiddleware(s.config.ApiURL))
+		r.Post("/internal/orders/{orderId}/status", orderHandler.HandleUpdateOrderStatus)
+	})
+
 	// Protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(s.config.JWT.Secret))

@@ -12,6 +12,11 @@ func Generate() string {
     return fmt.Sprintf("ORD-%d-%06d", time.Now().Year(), time.Now().UnixNano()%1000000)
 }
 
+// GenerateTrackingID creates a unique tracking number for shipments
+func GenerateTrackingID() string {
+    return fmt.Sprintf("TRK-%d-%06d", time.Now().Year(), time.Now().UnixNano()%1000000)
+}
+
 // Helper function to convert a models.UserAddress to a models.OrderAddress (JSONB snapshot)
 func ToOrderAddress(addr *models.UserAddress) models.OrderAddress {
 	return models.OrderAddress{

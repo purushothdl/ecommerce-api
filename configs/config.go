@@ -9,19 +9,25 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/purushothdl/ecommerce-api/internal/shared/tasks"
 )
 
+// Main configuration struct
 type Config struct {
-	Env      string
-	Port     int
-	DB       DBConfig
-	JWT      JWTConfig
-	Server   ServerConfig
-	Timeouts TimeoutConfig
-	CORS     CORSConfig
-	Stripe   StripeConfig
+	Env            string
+	Port           int
+	DB             DBConfig
+	JWT            JWTConfig
+	Server         ServerConfig
+	Timeouts       TimeoutConfig
+	CORS           CORSConfig
+	Stripe         StripeConfig
+	ApiURL         string
+	OrderFinancials OrderFinancialsConfig
+	GCTasks        tasks.TaskCreatorConfig
 }
 
+// Database configuration
 type DBConfig struct {
 	DSN             string
 	MaxOpenConns    int
@@ -30,12 +36,14 @@ type DBConfig struct {
 	ConnMaxIdleTime time.Duration
 }
 
+// JWT authentication configuration
 type JWTConfig struct {
 	Secret               string
 	AccessTokenDuration  time.Duration
 	RefreshTokenDuration time.Duration
 }
 
+// Server operation configuration
 type ServerConfig struct {
 	ReadTimeout      time.Duration
 	WriteTimeout     time.Duration
@@ -44,6 +52,7 @@ type ServerConfig struct {
 	GracefulShutdown bool
 }
 
+// Timeout configuration for various operations
 type TimeoutConfig struct {
 	Auth      time.Duration
 	UserOps   time.Duration
@@ -51,6 +60,7 @@ type TimeoutConfig struct {
 	Database  time.Duration
 }
 
+// CORS configuration for API access control
 type CORSConfig struct {
 	AllowOrigins     []string
 	AllowMethods     []string
@@ -60,14 +70,22 @@ type CORSConfig struct {
 	MaxAge           int
 }
 
+// Order financials configuration
+type OrderFinancialsConfig struct {
+	OrderShippingCost    float64
+	OrderTaxRate         float64
+	OrderDiscountAmount  float64
+}
+
+// Stripe payment configuration
 type StripeConfig struct {
 	SecretKey      string
 	WebhookSecret  string
 }
 
-func LoadConfig() (*Config, error) {
+func LoadConfig(path string) (*Config, error) {
 	// Load .env file if it exists (ignore error in production)
-	if err := godotenv.Load(); err != nil && os.Getenv("ENV") != "production" {
+	if err := godotenv.Load(path); err != nil && os.Getenv("ENV") != "production" {
 		// Only log in development
 		fmt.Printf("Warning: .env file not found: %v\n", err)
 	}
@@ -113,9 +131,26 @@ func LoadConfig() (*Config, error) {
 			AllowCredentials: getEnvAsBool("CORS_ALLOW_CREDENTIALS", true),
 			MaxAge:           getEnvAsInt("CORS_MAX_AGE", 86400),
 		},
+
 		Stripe: StripeConfig{
 			SecretKey:     getEnv("STRIPE_SECRET_KEY", ""),
 			WebhookSecret: getEnv("STRIPE_WEBHOOK_SECRET", ""),
+		},
+
+		ApiURL: getEnv("ECOMMERCE_API_URL", ""),
+
+		OrderFinancials: OrderFinancialsConfig{
+			OrderShippingCost:    getEnvAsFloat64("ORDER_SHIPPING_COST", 50.00),
+			OrderTaxRate:         getEnvAsFloat64("ORDER_TAX_RATE", 0.18),
+			OrderDiscountAmount:  getEnvAsFloat64("ORDER_DISCOUNT_AMOUNT", 0.00),
+		},
+
+		GCTasks: tasks.TaskCreatorConfig{
+			ProjectID:      getEnv("GCP_PROJECT_ID", ""),
+			LocationID:     getEnv("GCP_TASKS_LOCATION_ID", ""),
+			QueueID:        getEnv("GCP_TASKS_QUEUE_ID", ""),
+			WorkerURL:      getEnv("MEGA_WORKER_URL", ""),
+			ServiceAccount: getEnv("MEGA_WORKER_SA_EMAIL", ""),
 		},
 	}
 
@@ -159,6 +194,15 @@ func getEnvAsInt(key string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+func getEnvAsFloat64(key string, fallback float64) float64 {
+    if valueStr, exists := os.LookupEnv(key); exists {
+        if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
+            return value
+        }
+    }
+    return fallback
 }
 
 func getEnvAsDuration(key string, fallback time.Duration) time.Duration {

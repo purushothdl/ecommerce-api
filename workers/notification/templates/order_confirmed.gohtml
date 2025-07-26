@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Order Confirmed</title>
+</head>
+<body>
+    <h1>Thank you for your order, #{{.OrderNumber}}!</h1>
+    <p>We've received your order and will begin processing it shortly.</p>
+    
+    <h2>Shipping to:</h2>
+    <p>
+        {{.ShippingAddress.Name}}<br>
+        {{.ShippingAddress.Street1}}<br>
+        {{.ShippingAddress.City}}, {{.ShippingAddress.State}} {{.ShippingAddress.PostalCode}}
+    </p>
+
+    <h2>Order Summary:</h2>
+    <table border="1" cellpadding="5" cellspacing="0">
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Quantity</th>
+                <th>Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Items}}
+            <tr>
+                <td>{{.ProductName}}</td>
+                <td>{{.Quantity}}</td>
+                <td>₹{{printf "%.2f" .UnitPrice}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    
+    <h3>Total: ₹{{printf "%.2f" .TotalAmount}}</h3>
+    <p>We'll notify you again once your order has shipped.</p>
+</body>
+</html>
