@@ -64,12 +64,12 @@ func (h *ShippingHandler) HandleOrderPacked(w http.ResponseWriter, r *http.Reque
 	
 	// Create the event for the next step (delivery)
 	shippedEvent := events.OrderShippedEvent{
-		OrderID:        event.OrderID,
-		OrderNumber:    event.OrderNumber, 
-		UserID:         event.UserID,
-		UserEmail:      event.UserEmail,
-		TrackingNumber: trackingNumber,
-		ShippedAt:      time.Now(),
+		OrderID:               event.OrderID,
+		OrderNumber:           event.OrderNumber,
+		UserID:                event.UserID,
+		UserEmail:             event.UserEmail,
+		TrackingNumber:        trackingNumber,
+		ShippedAt:             time.Now(),
 		EstimatedDeliveryDate: estimatedDeliveryDate,
 	}
 

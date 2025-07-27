@@ -5,11 +5,12 @@
     <style>
         body { font-family: sans-serif; }
         strong { color: #0056b3; }
+        .order-number { font-weight: bold; color: black; }
     </style>
 </head>
 <body>
     <h1>Good news! Your order has shipped!</h1>
-    <p>Your order #{{.OrderNumber}} is on its way to you.</p>
+    <p>Your order <span class="order-number">#{{.OrderNumber}}</span> is on its way to you.</p>
     <p>
         Tracking Number: <strong>{{.TrackingNumber}}</strong>
     </p>

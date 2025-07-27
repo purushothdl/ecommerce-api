@@ -58,19 +58,19 @@ func (s *TemplateService) GenerateOrderConfirmedEmail(payload events.OrderCreate
 }
 
 func (s *TemplateService) GenerateOrderPackedEmail(payload events.OrderPackedEvent) (subject string, body string, err error) {
-	subject = fmt.Sprintf("Your GoKart Order #%d is Being Processed", payload.OrderID)
+	subject = fmt.Sprintf("Your GoKart Order #%s is Being Processed", payload.OrderNumber)
 	body, err = s.execute("order_packed.gohtml", payload)
 	return
 }
 
 func (s *TemplateService) GenerateOrderShippedEmail(payload events.OrderShippedEvent) (subject string, body string, err error) {
-	subject = fmt.Sprintf("Your GoKart Order #%d Has Shipped!", payload.OrderID)
+	subject = fmt.Sprintf("Your GoKart Order #%s Has Shipped!", payload.OrderNumber)
 	body, err = s.execute("order_shipped.gohtml", payload)
 	return
 }
 
 func (s *TemplateService) GenerateOrderDeliveredEmail(payload events.OrderDeliveredEvent) (subject string, body string, err error) {
-	subject = fmt.Sprintf("Your GoKart Order #%d Has Been Delivered!", payload.OrderID)
+	subject = fmt.Sprintf("Your GoKart Order #%s Has Been Delivered!", payload.OrderNumber)
 	body, err = s.execute("order_delivered.gohtml", payload)
 	return
 }

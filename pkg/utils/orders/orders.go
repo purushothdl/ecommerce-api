@@ -9,7 +9,8 @@ import (
 
 // Generate creates a unique order number (stub - use real seq in DB if needed)
 func Generate() string {
-    return fmt.Sprintf("ORD-%d-%06d", time.Now().Year(), time.Now().UnixNano()%1000000)
+	t := time.Now()
+	return fmt.Sprintf("ORD-%s-%06d", t.Format("20060102"), t.UnixNano()%1_000_000)
 }
 
 // GenerateTrackingID creates a unique tracking number for shipments

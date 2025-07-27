@@ -48,9 +48,9 @@
         });
         
         if (error) {
-            document.getElementById('result').textContent = `❌ Payment failed: ${error.message}`;
+            document.getElementById('result').textContent = `Payment failed: ${error.message}`;
         } else {
-            document.getElementById('result').textContent = `🎉 Payment successful!
+            document.getElementById('result').textContent = `Payment successful!
 Payment Intent ID: ${paymentIntent.id}
 Status: ${paymentIntent.status}
 Amount: $${(paymentIntent.amount / 100).toFixed(2)}`;

@@ -136,9 +136,25 @@ func (r *orderRepository) GetByUserID(ctx context.Context, userID int64) ([]*mod
 }
 
 func (r *orderRepository) GetByPaymentIntentID(ctx context.Context, paymentIntentID string) (*models.Order, error) {
-	query := `SELECT id, user_id, status, payment_status, total_amount FROM orders WHERE payment_intent_id = $1`
+	// THE FIX: Select all the columns from the orders table that we need.
+	query := `
+        SELECT 
+            id, user_id, order_number, status, payment_status, payment_method, 
+            payment_intent_id, shipping_address, billing_address, subtotal, 
+            tax_amount, shipping_cost, discount_amount, total_amount, notes, 
+            tracking_number, estimated_delivery_date, created_at, updated_at
+        FROM orders 
+        WHERE payment_intent_id = $1`
+
 	order := &models.Order{}
-	err := r.db.QueryRowContext(ctx, query, paymentIntentID).Scan(&order.ID, &order.UserID, &order.Status, &order.PaymentStatus, &order.TotalAmount)
+	err := r.db.QueryRowContext(ctx, query, paymentIntentID).Scan(
+		&order.ID, &order.UserID, &order.OrderNumber, &order.Status, &order.PaymentStatus,
+		&order.PaymentMethod, &order.PaymentIntentID, &order.ShippingAddress, &order.BillingAddress,
+		&order.Subtotal, &order.TaxAmount, &order.ShippingCost, &order.DiscountAmount,
+		&order.TotalAmount, &order.Notes, &order.TrackingNumber, &order.EstimatedDeliveryDate,
+		&order.CreatedAt, &order.UpdatedAt,
+	)
+
 	if err == sql.ErrNoRows {
 		return nil, apperrors.ErrNotFound
 	} else if err != nil {

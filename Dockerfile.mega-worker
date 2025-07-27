@@ -16,6 +16,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/mega-worker -ldflags="-w -s" .
 # ---- Final Stage ----
 FROM gcr.io/distroless/static-debian12
 
+USER nonroot:nonroot
+
 WORKDIR /app
 
 COPY --from=builder /app/bin/mega-worker /app/bin/mega-worker

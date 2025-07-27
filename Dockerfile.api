@@ -27,6 +27,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/api -ldflags="-w -s" ./cmd/api
 # It's more secure as it doesn't even have a shell.
 FROM gcr.io/distroless/static-debian12
 
+# Set a non-root user for security. The distroless image defaults to this.
+USER nonroot:nonroot
+
 # Set the working directory
 WORKDIR /app
 

@@ -15,7 +15,6 @@ type OrderCreatedEvent struct {
 	TotalAmount     float64          `json:"total_amount"`
 	OrderDate       time.Time        `json:"order_date"`
 	Items           []OrderItemInfo  `json:"items"`
-	ShippingAddress OrderAddressInfo `json:"shipping_address"`
 }
 
 // OrderPackedEvent is triggered by the warehouse.

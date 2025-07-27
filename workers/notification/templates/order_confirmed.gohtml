@@ -2,17 +2,14 @@
 <html>
 <head>
     <title>Order Confirmed</title>
+    <style>
+        body { font-family: sans-serif; }
+        strong { color: #0056b3; }
+    </style>
 </head>
 <body>
-    <h1>Thank you for your order, #{{.OrderNumber}}!</h1>
+    <h1>Thank you for your order, <strong>#{{.OrderNumber}}</strong>!</h1>
     <p>We've received your order and will begin processing it shortly.</p>
-    
-    <h2>Shipping to:</h2>
-    <p>
-        {{.ShippingAddress.Name}}<br>
-        {{.ShippingAddress.Street1}}<br>
-        {{.ShippingAddress.City}}, {{.ShippingAddress.State}} {{.ShippingAddress.PostalCode}}
-    </p>
 
     <h2>Order Summary:</h2>
     <table border="1" cellpadding="5" cellspacing="0">

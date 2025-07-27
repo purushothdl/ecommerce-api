@@ -181,7 +181,6 @@ func (s *orderService) HandlePaymentSucceeded(ctx context.Context, paymentIntent
 	var orderItems []*models.OrderItem
 
 	// The transaction ensures we only create the task if the DB update succeeds.
-	// We also fetch all necessary data for our events inside this transaction for consistency.
 	err := s.store.ExecTx(ctx, func(q *domain.Queries) error {
 		var txErr error
 		order, txErr = q.OrderRepo.GetByPaymentIntentID(ctx, paymentIntentID)
@@ -202,7 +201,7 @@ func (s *orderService) HandlePaymentSucceeded(ctx context.Context, paymentIntent
 			return txErr
 		}
 
-		// CRITICAL FIX: Fetch the order items associated with this order.
+		// Fetch the order items associated with this order.
 		orderItems, txErr = q.OrderRepo.GetItemsByOrderID(ctx, order.ID)
 		if txErr != nil {
 			s.logger.Error("failed to get order items for event", "order_id", order.ID)
@@ -220,13 +219,6 @@ func (s *orderService) HandlePaymentSucceeded(ctx context.Context, paymentIntent
 
 	// This happens *after* the transaction has successfully committed.
 	if order != nil && user != nil {
-
-		// The address is stored as JSON in the order, so we unmarshal it.
-		var orderShippingAddress events.OrderAddressInfo
-		if err := json.Unmarshal(order.ShippingAddress, &orderShippingAddress); err != nil {
-			s.logger.Error("failed to unmarshal shipping address for event", "order_id", order.ID, "error", err)
-			// We still attempt to send the fulfillment task even if address parsing fails for the email.
-		}
 
 		// Map database order items to the event's OrderItemInfo struct.
 		// This now works because 'orderItems' was populated inside the transaction.
@@ -248,7 +240,6 @@ func (s *orderService) HandlePaymentSucceeded(ctx context.Context, paymentIntent
 			TotalAmount:     order.TotalAmount,
 			OrderDate:       order.CreatedAt,
 			Items:           eventItems,
-			ShippingAddress: orderShippingAddress,
 		}
 
 		if err := s.taskCreator.CreateFulfillmentTask(ctx, "/handle/order-created", fulfillmentEvent); err != nil {
