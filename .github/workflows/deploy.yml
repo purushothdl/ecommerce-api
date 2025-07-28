@@ -48,12 +48,40 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for git history to determine version
 
       - name: 'Get changed files'
         id: changed-files
         uses: tj-actions/changed-files@v44
         with:
           files: ${{ matrix.service.paths }}
+
+      # Generate semantic version
+      - name: Generate version tags
+        if: steps.changed-files.outputs.any_changed == 'true'
+        id: version
+        run: |
+          # Get the latest git tag or default to v1.0.0
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+          echo "Latest tag found: $LATEST_TAG"
+          
+          # Extract version numbers (remove 'v' prefix if present)
+          VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/^v//')
+          
+          # Split version into parts
+          IFS='.' read -r -a VERSION_PARTS <<< "$VERSION_NUMBER"
+          MAJOR=${VERSION_PARTS[0]:-1}
+          MINOR=${VERSION_PARTS[1]:-0}
+          PATCH=${VERSION_PARTS[2]:-0}
+          
+          # Auto-increment patch version
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+          
+          echo "Generated new version: $NEW_VERSION"
+          echo "semantic_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "version_number=${MAJOR}.${MINOR}.${NEW_PATCH}" >> $GITHUB_OUTPUT
 
       - name: Authenticate to Google Cloud
         if: steps.changed-files.outputs.any_changed == 'true'
@@ -62,7 +90,6 @@ jobs:
           workload_identity_provider: 'projects/138027296220/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider-v2'
           service_account: '${{ secrets.GCP_SA_EMAIL_FOR_ACTIONS }}'
 
-      # ADD THIS STEP - Configure Docker to authenticate with Artifact Registry
       - name: Configure Docker for Artifact Registry
         if: steps.changed-files.outputs.any_changed == 'true'
         run: |
@@ -72,13 +99,16 @@ jobs:
         if: steps.changed-files.outputs.any_changed == 'true'
         uses: docker/setup-buildx-action@v3
 
-      - name: 'Debug: Print image tags'
+      - name: 'Debug: Print all tags'
         if: steps.changed-files.outputs.any_changed == 'true'
         run: |
           echo "Service Name: ${{ matrix.service.name }}"
-          echo "Project ID from Secret: ${{ secrets.GCP_PROJECT_ID }}"
-          echo "Full Image Tag: ${{ env.GCP_GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/${{ matrix.service.name }}:${{ github.sha }}"
+          echo "SHA Tag: ${{ github.sha }}"
+          echo "Semantic Version: ${{ steps.version.outputs.semantic_version }}"
+          echo "Version Number: ${{ steps.version.outputs.version_number }}"
+          echo "Image Base: ${{ env.GCP_GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/${{ matrix.service.name }}"
 
+      # Build and push with multiple tags
       - name: Build and push Docker image
         if: steps.changed-files.outputs.any_changed == 'true'
         uses: docker/build-push-action@v6
@@ -86,7 +116,11 @@ jobs:
           context: .
           file: ${{ matrix.service.dockerfile }}
           push: true
-          tags: ${{ env.GCP_GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/${{ matrix.service.name }}:${{ github.sha }}
+          tags: |
+            ${{ env.GCP_GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/${{ matrix.service.name }}:${{ github.sha }}
+            ${{ env.GCP_GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/${{ matrix.service.name }}:${{ steps.version.outputs.semantic_version }}
+            ${{ env.GCP_GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/${{ matrix.service.name }}:${{ steps.version.outputs.version_number }}
+            ${{ env.GCP_GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/${{ matrix.service.name }}:latest
 
       - name: Deploy to Cloud Run
         if: steps.changed-files.outputs.any_changed == 'true'
@@ -94,4 +128,14 @@ jobs:
         with:
           service: ${{ matrix.service.run_service_name }}
           region: ${{ env.GCP_REGION }}
+          # Deploy using SHA for exact traceability
           image: ${{ env.GCP_GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/${{ matrix.service.name }}:${{ github.sha }}
+
+      # Create git tag for the new version
+      - name: Create and push git tag
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "${{ steps.version.outputs.semantic_version }}" -m "Release ${{ steps.version.outputs.semantic_version }} for ${{ matrix.service.name }}"
+          git push origin "${{ steps.version.outputs.semantic_version }}"
