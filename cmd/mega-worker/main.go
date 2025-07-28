@@ -91,6 +91,9 @@ func run() error {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	logger.Info("starting mega-worker server", "port", cfg.Port)
+	logger.Info("starting mega-worker server", 
+		"port", cfg.Port,
+		"version", "1.0.4",
+	)
 	return server.ListenAndServe()
 }
