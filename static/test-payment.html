@@ -29,7 +29,7 @@
     const stripe = Stripe('publishable_key');
     
     // The client_secret from your API response
-    const clientSecret = 'secret_key';
+    const clientSecret = 'client_secret';
     
     const elements = stripe.elements();
     const cardElement = elements.create('card');

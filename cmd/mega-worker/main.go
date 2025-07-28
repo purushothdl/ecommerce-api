@@ -57,10 +57,11 @@ func run() error {
 	}
 
     // Initialize Template Service
-    templateService, err := notification.NewTemplateService("workers/notification/templates")
-    if err != nil {
-        return fmt.Errorf("failed to create template service: %w", err)
-    }
+    templateService, err := notification.NewTemplateService()
+	if err != nil {
+		return fmt.Errorf("failed to create template service: %w", err)
+	}
+    
 
 	emailService := notification.NewEmailService(cfg.ResendAPIKey, cfg.ResendFromEmail, cfg.ResendFromName, logger)
 	

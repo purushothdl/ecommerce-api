@@ -3,13 +3,16 @@ package notification
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
 	"html/template"
-	"path/filepath"
 	"time"
 
 	"github.com/purushothdl/ecommerce-api/events"
 )
+
+//go:embed all:templates/*.gohtml
+var templateFS embed.FS
 
 // TemplateService manages parsing and executing HTML email templates.
 type TemplateService struct {
@@ -26,11 +29,12 @@ var templateFuncs = template.FuncMap{
 	},
 }
 
-func NewTemplateService(templatesDir string) (*TemplateService, error) {
-
-	tmpls, err := template.New("").Funcs(templateFuncs).ParseGlob(filepath.Join(templatesDir, "*.gohtml"))
+func NewTemplateService() (*TemplateService, error) {
+	// Create a new template and register the custom functions first.
+	// Then, parse the embedded files into this template.
+	tmpls, err := template.New("").Funcs(templateFuncs).ParseFS(templateFS, "templates/*.gohtml")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse templates from %s: %w", templatesDir, err)
+		return nil, fmt.Errorf("failed to parse templates from embedded FS: %w", err)
 	}
 
 	return &TemplateService{

@@ -1,5 +1,8 @@
 # Makefile
 .PHONY: migrateup migratedown run hashtest seed test-payment run-worker
+ 
+include api.env 
+export
 
 # Use the DB_DSN directly if it's already a valid PostgreSQL URL
 MIGRATE_DSN := $(DB_DSN)

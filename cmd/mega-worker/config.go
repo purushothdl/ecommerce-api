@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -35,8 +36,9 @@ type WorkerConfig struct {
 }
 
 func LoadWorkerConfig(path string) (*WorkerConfig, error) {
-	if err := godotenv.Load(path); err != nil {
-		return nil, err
+	// Not needed in prodution
+	if err := godotenv.Load(path); err != nil && os.Getenv("ENV") != "production" {
+		fmt.Printf("Warning: .env file not found at %s: %v\n", path, err)
 	}
 
 	port := os.Getenv("PORT")
