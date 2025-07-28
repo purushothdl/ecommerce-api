@@ -67,6 +67,14 @@ jobs:
         if: steps.changed-files.outputs.any_changed == 'true'
         uses: docker/setup-buildx-action@v3
 
+      # --- NEW DEBUG STEP ---
+      - name: 'Debug: Print image tags'
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          echo "Service Name: ${{ matrix.service.name }}"
+          echo "Project ID from Secret: ${{ secrets.GCP_PROJECT_ID }}"
+          echo "Full Image Tag: ${{ env.GCP_GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/${{ matrix.service.name }}:${{ github.sha }}"
+
       - name: Build and push Docker image
         if: steps.changed-files.outputs.any_changed == 'true'
         uses: docker/build-push-action@v6
