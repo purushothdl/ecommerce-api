@@ -153,7 +153,7 @@ func (app *application) startServer() error {
 	app.logger.Info("starting server",
 		"env", app.config.Env,
 		"port", app.config.Port,
-		"version", "1.0.1", 
+		"version", "1.0.2", 
 		"read_timeout", app.config.Server.ReadTimeout,
 		"write_timeout", app.config.Server.WriteTimeout,
 	)
