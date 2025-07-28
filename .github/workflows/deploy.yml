@@ -59,7 +59,7 @@ jobs:
         if: steps.changed-files.outputs.any_changed == 'true'
         uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: 'projects/${{ secrets.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider'
+          workload_identity_provider: 'projects/138027296220/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider-v2'
           service_account: '${{ secrets.GCP_SA_EMAIL_FOR_ACTIONS }}'
 
       # ADD THIS STEP - Configure Docker to authenticate with Artifact Registry
