@@ -24,7 +24,7 @@ jobs:
       matrix:
         service:
           - name: api
-            run_service_name: gokart-api
+            run_service_name: api
             dockerfile: Dockerfile.api
             paths: |
               cmd/api/**
