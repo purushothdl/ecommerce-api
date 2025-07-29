@@ -68,8 +68,9 @@ func (r *productRepository) GetAll(ctx context.Context, filters domain.ProductFi
 	// Query builder for dynamic filtering and pagination
 	var queryBuilder strings.Builder
 	queryBuilder.WriteString(`
-        SELECT p.id, p.name, p.description, p.price, p.stock_quantity, p.category_id, p.brand, p.thumbnail,
-               c.name as category_name
+        SELECT p.id, p.name, p.description, p.price, p.stock_quantity, p.category_id, p.brand,
+               p.images, p.thumbnail, p.created_at, p.updated_at, p.version,
+               c.name as category_name, c.created_at as category_created_at, c.updated_at as category_updated_at
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
     `)
@@ -84,7 +85,7 @@ func (r *productRepository) GetAll(ctx context.Context, filters domain.ProductFi
 		argCount++
 	}
 
-	// NEW: Add search query condition
+	// Add search query condition
 	if filters.SearchQuery != "" {
 		conditions = append(conditions, fmt.Sprintf("(p.name ILIKE $%d OR p.description ILIKE $%d OR p.brand ILIKE $%d)", argCount, argCount+1, argCount+2))
 		args = append(args, "%"+filters.SearchQuery+"%", "%"+filters.SearchQuery+"%", "%"+filters.SearchQuery+"%")
@@ -110,8 +111,9 @@ func (r *productRepository) GetAll(ctx context.Context, filters domain.ProductFi
 		var p models.Product
 		var cat models.Category
 		err := rows.Scan(
-			&p.ID, &p.Name, &p.Description, &p.Price, &p.StockQuantity, &p.CategoryID, &p.Brand, &p.Thumbnail,
-			&cat.Name,
+			&p.ID, &p.Name, &p.Description, &p.Price, &p.StockQuantity, &p.CategoryID, &p.Brand,
+			&p.Images, &p.Thumbnail, &p.CreatedAt, &p.UpdatedAt, &p.Version,
+			&cat.Name, &cat.CreatedAt, &cat.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("product repository: failed to scan row: %w", err)
