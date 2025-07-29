@@ -50,7 +50,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Needed for git history to determine version
+          fetch-depth: 0  
 
       - name: 'Get changed files'
         id: changed-files
@@ -132,11 +132,3 @@ jobs:
           # Deploy using SHA for exact traceability
           image: ${{ env.GCP_GAR_HOST }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.GCP_ARTIFACT_REPO }}/${{ matrix.service.name }}:${{ github.sha }}
 
-      # Create git tag for the new version
-      - name: Create and push git tag
-        if: steps.changed-files.outputs.any_changed == 'true'
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git tag -a "${{ steps.version.outputs.semantic_version }}" -m "Release ${{ steps.version.outputs.semantic_version }} for ${{ matrix.service.name }}"
-          git push origin "${{ steps.version.outputs.semantic_version }}"
