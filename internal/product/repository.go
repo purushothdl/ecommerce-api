@@ -84,6 +84,13 @@ func (r *productRepository) GetAll(ctx context.Context, filters domain.ProductFi
 		argCount++
 	}
 
+	// NEW: Add search query condition
+	if filters.SearchQuery != "" {
+		conditions = append(conditions, fmt.Sprintf("(p.name ILIKE $%d OR p.description ILIKE $%d OR p.brand ILIKE $%d)", argCount, argCount+1, argCount+2))
+		args = append(args, "%"+filters.SearchQuery+"%", "%"+filters.SearchQuery+"%", "%"+filters.SearchQuery+"%")
+		argCount += 3 
+	}
+	
 	if len(conditions) > 0 {
 		queryBuilder.WriteString(" WHERE ")
 		queryBuilder.WriteString(strings.Join(conditions, " AND "))

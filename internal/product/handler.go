@@ -30,6 +30,7 @@ func NewHandler(productSvc domain.ProductService, categorySvc domain.CategorySer
 func (h *Handler) HandleListProducts(w http.ResponseWriter, r *http.Request) {
 	filters := domain.ProductFilters{
 		Category: r.URL.Query().Get("category"),
+		SearchQuery: r.URL.Query().Get("q"),
 		Page:     1,
 		PageSize: 10, 
 	}
