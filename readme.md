@@ -1,232 +1,153 @@
-# Go E-Commerce API
+# GoKart E-Commerce API: A Cloud-Native Microservices Backend
 
 ![Go Version](https://img.shields.io/badge/go-1.24-blue.svg)
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
-![Chi Router](https://img.shields.io/badge/Chi-v5-FF6F61.svg)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-4169E1.svg)
+![Architecture](https://img.shields.io/badge/architecture-event--driven-9cf)
+![Deployment](https://img.shields.io/badge/deploy-Google%20Cloud%20Run-4285F4)
 ![Docker](https://img.shields.io/badge/Docker-20.10+-2496ED.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1.svg)
 
-A robust and feature-rich backend for an e-commerce platform, built with Go. This project is a demonstration of modern backend development best practices, including a clean, layered architecture, secure authentication, and robust database management. It is designed to be scalable, maintainable, and easy to extend.
+**GoKart** is a production-ready, cloud-native backend for a modern e-commerce platform, architected using Go. This project serves as a comprehensive demonstration of building a scalable, resilient, and secure system following professional software engineering principles.
 
-## Key Features
+The architecture intentionally evolves from a clean, layered monolith for core API services to a decoupled, event-driven model using serverless workers for asynchronous processing. This showcases a pragmatic approach to system design, applying complexity where it adds tangible value in resilience and scalability.
 
--   **Secure Authentication:**
-    -   Stateful session management using JWT access tokens and secure, HttpOnly refresh tokens.
-    -   Password hashing using `bcrypt`.
-    -   Complete session control: view active sessions, log out from a specific device, or log out from all devices.
--   **User Management:**
-    -   User registration and profile management (update details, change password).
-    -   Secure account deletion.
--   **Administrator Role:**
-    -   Role-based access control (RBAC) via middleware.
-    -   Admin-only endpoints for complete User CRUD (Create, Read, Update, Delete) operations.
--   **Product & Category System:**
-    -   List products with filtering (by category) and pagination.
-    -   View detailed product information.
-    -   List all product categories.
--   **Shopping Cart Logic:**
-    -   Persistent carts for both authenticated and anonymous users.
-    -   Seamlessly merges an anonymous user's cart to their account upon registration or login.
-    -   Full cart item management (add, update quantity, remove).
--   **Database Seeding:**
-    -   A powerful seeder script to populate the database with realistic product data from an external API (`dummyjson.com`) and create a default admin user.
+---
 
-## Architectural Highlights
+## Architectural Pillars & Key Features
 
-This project was built with a strong emphasis on clean architecture and professional development patterns.
+This project was built with a strong emphasis on professional design patterns that address real-world engineering challenges.
 
--   **Clean Architecture:** Follows the **Handler-Service-Repository** pattern to ensure a clear separation of concerns.
-    -   **Handlers:** Manage HTTP request/response logic.
-    -   **Services:** Contain the core business logic.
-    -   **Repositories:** Abstract database interactions.
--   **Secure by Design:** The authentication flow is built on modern security standards to prevent common vulnerabilities like CSRF and XSS attacks related to token handling.
--   **Transactional Integrity:** Critical operations that involve multiple database writes (e.g., user registration with cart merging) are executed within a single **atomic transaction** to ensure data consistency.
--   **Structured Logging:** Utilizes the structured logging library `slog` for clear, context-rich application logs that are invaluable for debugging.
--   **Configuration Management:** All environment-specific settings (database connections, JWT secrets, server timeouts) are managed via a dedicated `configs` package and loaded from a `.env` file, ensuring no sensitive data is hardcoded.
--   **Robust Middleware:** A well-defined middleware chain handles logging, CORS, panic recovery, request timeouts, and authentication, keeping the handler logic clean and focused.
+### 1. Decoupled, Event-Driven Fulfillment
+The core of the application is its asynchronous, message-driven order fulfillment pipeline. This architecture provides exceptional resilience and scalability.
 
-## Tech Stack
+-   **Serverless Workers:** Long-running processes (warehouse, shipping, delivery, notifications) are handled by a separate, internal-only microservice (`mega-worker`) deployed on Cloud Run.
+-   **Asynchronous Orchestration:** **Google Cloud Tasks** is used as a durable, at-least-once task queue to orchestrate the multi-step fulfillment workflow, ensuring no orders are lost.
+-   **Resilience by Design:** A failure in a downstream service (e.g., the notification worker's email provider is down) has **zero impact** on the critical path of order processing. The failed task is automatically retried without affecting other parts of the system.
+-   **Scalability:** The public-facing API and the internal worker are deployed as separate Cloud Run services, allowing them to be scaled independently based on their specific loads.
 
--   **Language:** Go
--   **Web Framework:** [Chi (v5)](https://github.com/go-chi/chi) - A lightweight, idiomatic and composable router for building Go HTTP services.
--   **Database:** PostgreSQL
--   **Migrations:** [golang-migrate](https://github.com/golang-migrate/migrate) - For database schema management.
--   **Authentication:** JWT & Refresh Tokens
--   **Environment:** godotenv
+*Diagram: Asynchronous Order Fulfillment Workflow (to be added)*
 
-## Project Structure
+### 2. Secure by Design
+Security is a foundational principle, not an afterthought, implemented through modern best practices.
 
-The project follows the standard layout for Go applications, promoting scalability and maintainability.
+-   **Secure Session Management:** Stateful sessions are managed using JWT access tokens (short-lived, stored in memory) and refresh tokens (long-lived, stored in **secure, `HttpOnly` cookies**), providing robust protection against XSS-based token theft.
+-   **Service-to-Service Authentication:** All internal communication between microservices (e.g., worker-to-API status updates) is secured using **Google-signed OIDC identity tokens**, eliminating the need for static API keys.
+-   **Least Privilege Principle:** Each service runs with a dedicated IAM Service Account that has the absolute minimum permissions required for its function.
+-   **Password Security:** Passwords are never stored. They are hashed using the industry-standard `bcrypt` algorithm.
 
-```
-.
-├── cmd/                # Application entry points (main.go)
-│   ├── api/            # Main API server
-│   └── seed/           # Database seeder
-├── configs/            # Configuration management
-├── internal/           # Private application logic
-│   ├── admin/          # Admin-specific domain
-│   ├── auth/           # Authentication domain
-│   ├── cart/           # Shopping cart domain
-│   ├── product/        # Product domain
-│   ├── user/           # User domain
-│   ├── database/       # Database connection & store
-│   ├── domain/         # Core domain types, interfaces
-│   ├── models/         # Database models
-│   ├── server/         # HTTP server setup & routing
-│   └── shared/         # Shared code (middleware, context)
-├── migrations/         # SQL database migrations
-├── pkg/                # Public library code (errors, response helpers)
-└── ...
-```
+<h4>Authentication Flow Diagrams</h4>
+<div style="display: flex; justify-content: space-between;">
+  <img src="architecture/login_and_token.png" alt="Login and Token Handling" style="width: 48%;">
+  <img src="architecture/refresh_token_handling.png" alt="Refresh Token Handling" style="width: 48%;">
+</div>
+
+### 3. Professional Engineering Practices
+The project adheres to patterns that promote maintainability, testability, and developer velocity.
+
+-   **Clean, Layered Architecture:** Follows the classic **Handler-Service-Repository** pattern to ensure a strict separation of concerns.
+-   **Atomic Transactions:** All critical, multi-step database operations (e.g., order creation with stock decrement, cart merging, cleanup jobs) are executed within **atomic transactions** to guarantee data consistency.
+-   **Configuration Management:** All environment-specific settings are externalized into `.env` files and loaded into typed structs, separating code from configuration (a Twelve-Factor App principle).
+-   **Automated CI/CD:** A comprehensive **GitHub Actions** workflow intelligently builds, tests, and deploys only the services whose code has changed, which is essential for a monorepo structure.
+-   **Seamless User Experience:** Features like the **anonymous-to-user cart merge** on login/register demonstrate a focus on practical, user-centric design.
+
+*Diagram: Anonymous-to-User Cart Merging (to be added)*
+
+---
+
+## Tech Stack & Tooling
+
+| Category | Technology / Tool | Rationale |
+| :--- | :--- | :--- |
+| **Language** | Go 1.24+ | Excellent performance, static typing, and a first-class ecosystem for cloud-native development. |
+| **Web Framework** | [Chi (v5)](https://github.com/go-chi/chi) | A lightweight, idiomatic, and composable router that encourages good API design. |
+| **Database** | PostgreSQL | A robust, open-source relational database with powerful features like `JSONB` and transactional integrity. |
+| **Migrations** | [golang-migrate](https://github.com/golang-migrate/migrate) | For managing database schema evolution in a version-controlled, repeatable manner. |
+| **Deployment** | [Google Cloud Run](https://cloud.google.com/run) | A fully-managed serverless platform that provides auto-scaling (including scale-to-zero) and a secure runtime. |
+| **Task Queue** | [Google Cloud Tasks](https://cloud.google.com/tasks) | A durable, serverless task queue for orchestrating asynchronous, event-driven workflows. |
+| **Containerization** | [Docker](https://www.docker.com/) | For creating reproducible, lightweight application images based on secure `distroless` base images. |
+| **CI/CD** | [GitHub Actions](https://github.com/features/actions) | For automating the build, push, and deployment pipeline for the multi-service monorepo. |
+| **Authentication** | JWT & OIDC Tokens | Modern standards for user session management and secure service-to-service communication. |
+
+---
 
 ## Getting Started
 
-Follow these instructions to get the project up and running on your local machine.
+Follow these instructions to get the complete project, including the database and all services, running locally.
 
 ### Prerequisites
 
--   Go 1.21+
--   PostgreSQL 15+
--   `make` (optional, for convenience)
+-   Go 1.24+
+-   Docker & Docker Compose
 -   [golang-migrate CLI](https://github.com/golang-migrate/migrate/tree/master/cmd/migrate)
+-   `gcloud` CLI (for authenticating to Google Cloud for task creation)
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/purushothdl/ecommerce-api.git
-cd ecommerce-api
+git clone https://github.com/purushothdl/gokart-ecommerce.git
+cd gokart-ecommerce
 ```
 
-### 2. Configure Environment
+### 2. Configure Local Environment
 
-Copy the example `.env` file and update it with your local PostgreSQL details.
+The project requires two environment files for its two services.
 
-```bash
-cp .env.example .env
-```
+1.  Copy the example files:
+    ```bash
+    cp api.env.example api.env
+    cp worker.env.example worker.env
+    ```
 
-Your `.env` file should look like this:
+2.  **Edit `api.env` and `worker.env`:**
+    -   **For Easy Local Setup:** To use the included Dockerized PostgreSQL database, set the `DB_DSN` in both files to:
+        ```
+        DB_DSN=postgres://postgres:password@postgres:5432/gokart?sslmode=disable
+        ```
+    -   Fill in your other credentials for Stripe, Resend, and Google Cloud as detailed in the files.
+    -   For local development, the `ECOMMERCE_API_URL` and `MEGA_WORKER_URL` can be set to `http://localhost:8080` and `http://localhost:8081` respectively, as Docker Compose makes them accessible.
 
-```env
-# Server Configuration
-PORT=8080
-ENV=development
+### 3. Run the Application Stack
 
-# Database Configuration (Update with your credentials)
-DB_DSN=postgres://youruser:yourpassword@localhost:5432/ecommerce?sslmode=disable
+1.  **Start all services:**
+    ```bash
+    docker-compose up --build
+    ```
+    This single command will:
+    -   Start a PostgreSQL database container.
+    -   Build the Docker image for the `api` server.
+    -   Build the Docker image for the `mega-worker`.
+    -   Start all three containers and connect them on an internal network.
 
-# JWT Configuration
-JWT_SECRET=a-very-strong-and-secret-key-that-is-at-least-32-bytes-long
+2.  **Run Database Migrations:**
+    In a separate terminal, run the `make` command to set up the database schema.
+    ```bash
+    make migrateup
+    ```
 
-# Admin user for seeder (Change this!)
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=supersecretpassword
-```
+3.  **Seed the Database (Optional but Recommended):**
+    This command creates a default admin user (`admin@example.com` / `supersecretpassword`) and populates the database with product data.
+    ```bash
+    make seed
+    ```
 
-**Note:** Ensure you have created a database named `ecommerce` in PostgreSQL.
+The **API Server** is now available at `http://localhost:8080`.
+The **Worker Server** is listening internally at `http://localhost:8081`.
 
-### 3. Run Database Migrations
-
-This will set up all the necessary tables in your database.
-
-```bash
-# With make (recommended)
-make migrateup
-
-# Or manually
-migrate -database "$DB_DSN" -path migrations up
-```
-
-### 4. Seed the Database (Optional but Recommended)
-
-This command will create a default admin user and populate the database with product data.
-
-```bash
-# With make
-make seed
-
-# Or manually
-go run ./cmd/seed/
-```
-
-### 5. Run the Application
-
-```bash
-# With make
-make run
-
-# Or manually
-go run ./cmd/api/main.go
-```
-
-The server will start on `http://localhost:8080`.
+---
 
 ## API Endpoints
 
-### Authentication
-
-| Method | Endpoint         | Description                                     | Access  |
-| :----- | :--------------- | :---------------------------------------------- | :------ |
-| `POST` | `/api/v1/auth/login` | Authenticate a user and get tokens.             | Public  |
-| `POST` | `/api/v1/auth/refresh` | Get a new access token using a refresh token.   | Public  |
-| `POST` | `/api/v1/auth/logout`  | Log out by revoking the current refresh token.  | User    |
-
-### User
-
-| Method   | Endpoint                  | Description                                      | Access |
-| :------- | :------------------------ | :----------------------------------------------- | :----- |
-| `POST`   | `/api/v1/users`           | Register a new user.                             | Public |
-| `GET`    | `/api/v1/users/profile`   | Get the authenticated user's profile.            | User   |
-| `PUT`    | `/api/v1/users/profile`   | Update the authenticated user's profile.         | User   |
-| `PUT`    | `/api/v1/users/password`  | Change the authenticated user's password.        | User   |
-| `DELETE` | `/api/v1/users/account`   | Delete the authenticated user's account.         | User   |
-| `GET`    | `/api/v1/auth/sessions`   | View all active sessions for the user.           | User   |
-| `DELETE` | `/api/v1/auth/sessions`   | Log out from all devices (revoke all sessions).  | User   |
-| `DELETE` | `/api/v1/auth/sessions/{sessionId}` | Log out from a specific session.                | User   |
-
-### Address Management
-
-| Method   | Endpoint                          | Description                                      | Access |
-| :------- | :-------------------------------- | :----------------------------------------------- | :----- |
-| `POST`   | `/api/v1/addresses`              | Create a new address.                            | User   |
-| `GET`    | `/api/v1/addresses`              | List all addresses for the user.                 | User   |
-| `GET`    | `/api/v1/addresses/{id}`         | Get details for a specific address.              | User   |
-| `PUT`    | `/api/v1/addresses/{id}`         | Update an address.                               | User   |
-| `DELETE` | `/api/v1/addresses/{id}`         | Delete an address.                               | User   |
-| `PUT`    | `/api/v1/addresses/{id}/set-default` | Set an address as default shipping/billing.    | User   |
-
-### Products & Categories
-
-| Method | Endpoint                    | Description                          | Access |
-| :----- | :-------------------------- | :----------------------------------- | :----- |
-| `GET`  | `/api/v1/products`          | Get a list of all products.          | Public |
-| `GET`  | `/api/v1/products/{productId}` | Get details for a single product.    | Public |
-| `GET`  | `/api/v1/categories`        | Get a list of all product categories.| Public |
-
-### Cart
-
-| Method   | Endpoint                       | Description                               | Access                |
-| :------- | :----------------------------- | :---------------------------------------- | :-------------------- |
-| `GET`    | `/api/v1/cart`                 | Get the current user's cart.              | User or Anonymous     |
-| `POST`   | `/api/v1/cart/items`           | Add an item to the cart.                  | User or Anonymous     |
-| `PATCH`  | `/api/v1/cart/items/{productId}` | Update an item's quantity in the cart.    | User or Anonymous     |
-| `DELETE` | `/api/v1/cart/items/{productId}` | Remove an item from the cart.             | User or Anonymous     |
-
-### Admin
-
-| Method   | Endpoint                     | Description                    | Access |
-| :------- | :--------------------------- | :----------------------------- | :----- |
-| `GET`    | `/api/v1/admin/users`        | Get a list of all users.       | Admin  |
-| `POST`   | `/api/v1/admin/users`        | Create a new user.             | Admin  |
-| `PUT`    | `/api/v1/admin/users/{userId}` | Update a user's details.       | Admin  |
-| `DELETE` | `/api/v1/admin/users/{userId}` | Delete a user.                 | Admin  |
+A comprehensive list of API endpoints can be found in `internal/server/routes.go`. Key routes include:
+-   **Authentication:** `/api/v1/auth/{login, refresh, logout}`
+-   **Users:** `/api/v1/users/{profile, password}`
+-   **Products:** `/api/v1/{products, categories}`
+-   **Cart:** `/api/v1/cart/**`
+-   **Orders:** `/api/v1/orders/**`
+-   **Admin:** `/api/v1/admin/**`
 
 ## Future Work & Roadmap
 
--   [ ] **Comprehensive Testing:** Implement unit tests for services and repositories, and integration tests for handlers.
--   [ ] **Containerization:** Add a `Dockerfile` and `docker-compose.yml` for easy setup and deployment.
--   [ ] **CI/CD Pipeline:** Set up GitHub Actions to automate testing and building.
--   [ ] **API Documentation:** Generate OpenAPI (Swagger) documentation for the API.
--   [ ] **Order Management:** Implement endpoints for creating and viewing orders.
--   [ ] **Payment Integration:** Integrate a payment gateway like Stripe.
+-   [ ] Implement a comprehensive test suite (unit, integration, e2e).
+-   [ ] Generate OpenAPI (Swagger) documentation for the API.
+-   [ ] Integrate a frontend application built with React or Vue.
+-   [ ] Enhance search functionality with a dedicated engine like Elasticsearch.

@@ -2,22 +2,58 @@
 version: '3.8'
 
 services:
-  # Main API Server Service
+  # -------------------------------------
+  # -- Optional PostgreSQL Database --
+  # -------------------------------------
+  # For easy local development without needing an external database.
+  # The 'api' and 'worker' services will connect to this if their DB_DSN
+  # points to 'postgres:5432'.
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: gokart
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -------------------------
+  # -- Main API Server --
+  # -------------------------
   api:
     build:
-      context: .  # The context is the whole project directory
-      dockerfile: Dockerfile.api # Use this specific Dockerfile
+      context: .
+      dockerfile: Dockerfile.api
     ports:
       - "8080:8080"
     env_file:
-      - api.env # Use the api-specific environment file
-
-  # Mega Worker Service
+      - api.env
+    depends_on:
+      postgres:
+        condition: service_healthy 
+        
+  # -------------------------
+  # -- Mega Worker Service --
+  # -------------------------
   mega-worker:
     build:
-      context: . # The context is also the whole project directory
-      dockerfile: Dockerfile.mega-worker # Use this specific Dockerfile
+      context: .
+      dockerfile: Dockerfile.mega-worker
     ports:
       - "8081:8081"
     env_file:
-      - worker.env # Use the worker-specific environment file
+      - worker.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+# Define a persistent volume for the database data
+volumes:
+  postgres_data:
