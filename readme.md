@@ -36,9 +36,9 @@ Security is a foundational principle, not an afterthought, implemented through m
 -   **Password Security:** Passwords are never stored. They are hashed using the industry-standard `bcrypt` algorithm.
 
 <h4>Authentication Flow Diagrams</h4>
-<div style="display: flex; justify-content: space-between;">
-  <img src="architecture/login_and_token.png" alt="Login and Token Handling" style="width: 48%;">
-  <img src="architecture/refresh_token_handling.png" alt="Refresh Token Handling" style="width: 48%;">
+<div style="display: flex; justify-content: space-between; align-items: stretch;">
+  <img src="architecture/login_and_token.png" alt="Login and Token Handling" style="width: 48%; height: 300px; object-fit: contain;">
+  <img src="architecture/refresh_token_handling.png" alt="Refresh Token Handling" style="width: 48%; height: 300px; object-fit: contain;">
 </div>
 
 ### 3. Professional Engineering Practices
