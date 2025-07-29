@@ -17,8 +17,9 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: 'read'
+      contents: 'write'
       id-token: 'write'
+      actions: 'read'
 
     strategy:
       matrix:
