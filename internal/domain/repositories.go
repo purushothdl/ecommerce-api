@@ -62,7 +62,8 @@ type CartRepository interface {
     UpdateItemQuantity(ctx context.Context, cartID int64, productID int64, quantity int) error
     RemoveItem(ctx context.Context, cartID int64, productID int64) error
 	GetItemsByCartID(ctx context.Context, cartID int64) ([]models.CartItem, error)
-	CleanupOldAnonymousCartItems(ctx context.Context, olderThanDays int) error
+	CleanupOldAnonymousCarts(ctx context.Context, olderThan time.Time) (int64, error)
+
 }
 
 // AddressRepository handles user address data operations
@@ -83,8 +84,9 @@ type OrderRepository interface {
 	GetByIDForUpdate(ctx context.Context, id int64, userID int64) (*models.Order, error)
     GetItemsByOrderID(ctx context.Context, orderID int64) ([]*models.OrderItem, error)
     GetByUserID(ctx context.Context, userID int64) ([]*models.Order, error)
-	GetOrderByID(ctx context.Context, id int64) (*models.Order, error) 
+	GetOrderByID(ctx context.Context, id int64) (*models.Order, error)   
 
+	FindPendingOrdersOlderThan(ctx context.Context, olderThan time.Time) ([]*models.Order, error) 
 	GetByPaymentIntentID(ctx context.Context, paymentIntentID string) (*models.Order, error)
 	UpdateStatus(ctx context.Context,id int64,status models.OrderStatus,paymentStatus models.PaymentStatus,trackingNumber *string, estimatedDeliveryDate *time.Time) error
 }

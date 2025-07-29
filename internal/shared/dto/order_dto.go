@@ -16,9 +16,10 @@ type CreateOrderRequest struct {
 
 // CreateOrderResponse is the specific data returned after successfully creating an order.
 type CreateOrderResponse struct {
-	OrderID      int64  `json:"order_id"`
-	OrderNumber  string `json:"order_number"`
-	ClientSecret string `json:"client_secret"` 
+	OrderID      int64   `json:"order_id"`
+	OrderNumber  string  `json:"order_number"`
+	ClientSecret string  `json:"client_secret"`
+	TotalAmount  float64 `json:"total_amount"`
 }
 
 // ConfirmPaymentRequest represents the input for confirming payment

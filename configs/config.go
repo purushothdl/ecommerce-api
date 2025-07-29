@@ -14,17 +14,17 @@ import (
 
 // Main configuration struct
 type Config struct {
-	Env            string
-	Port           int
-	DB             DBConfig
-	JWT            JWTConfig
-	Server         ServerConfig
-	Timeouts       TimeoutConfig
-	CORS           CORSConfig
-	Stripe         StripeConfig
-	ApiURL         string
-	OrderFinancials OrderFinancialsConfig
-	GCTasks        tasks.TaskCreatorConfig
+	Env             string
+	Port            int
+	DB              DBConfig
+	JWT             JWTConfig
+	Server          ServerConfig
+	Timeouts        TimeoutConfig
+	CORS            CORSConfig
+	Stripe          StripeConfig
+	ApiURL          string
+	OrderFinancials *OrderFinancialsConfig
+	GCTasks         tasks.TaskCreatorConfig
 }
 
 // Database configuration
@@ -139,7 +139,7 @@ func LoadConfig(path string) (*Config, error) {
 
 		ApiURL: getEnv("ECOMMERCE_API_URL", ""),
 
-		OrderFinancials: OrderFinancialsConfig{
+		OrderFinancials: &OrderFinancialsConfig{
 			OrderShippingCost:    getEnvAsFloat64("ORDER_SHIPPING_COST", 50.00),
 			OrderTaxRate:         getEnvAsFloat64("ORDER_TAX_RATE", 0.18),
 			OrderDiscountAmount:  getEnvAsFloat64("ORDER_DISCOUNT_AMOUNT", 0.00),
@@ -152,6 +152,7 @@ func LoadConfig(path string) (*Config, error) {
 			WorkerURL:      getEnv("MEGA_WORKER_URL", ""),
 			ServiceAccount: getEnv("MEGA_WORKER_SA_EMAIL", ""),
 		},
+
 	}
 
 	// Validate critical config

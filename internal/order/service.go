@@ -25,11 +25,11 @@ type orderService struct {
 	paymentService domain.PaymentService 
 	taskCreator    *tasks.TaskCreator
 	logger         *slog.Logger
-	config         configs.OrderFinancialsConfig
+	config         *configs.OrderFinancialsConfig
 }
 
 // NewOrderService creates a new OrderService
-func NewOrderService(store domain.Store, paymentService domain.PaymentService, taskCreator *tasks.TaskCreator, logger *slog.Logger, config configs.OrderFinancialsConfig) domain.OrderService {
+func NewOrderService(store domain.Store, paymentService domain.PaymentService, taskCreator *tasks.TaskCreator, logger *slog.Logger, config *configs.OrderFinancialsConfig) domain.OrderService {
 	return &orderService{
 		store:          store,
 		paymentService: paymentService,
@@ -167,6 +167,7 @@ func (s *orderService) CreateOrder(ctx context.Context, userID int64, cartID int
 			OrderID:      order.ID,
 			OrderNumber:  order.OrderNumber,
 			ClientSecret: stripePI.ClientSecret,
+			TotalAmount:  order.TotalAmount,
 		}
 		return nil
 	})
@@ -328,7 +329,7 @@ func (s *orderService) CancelOrder(ctx context.Context, userID, orderID int64) e
 		}
 
 		// 2. Business Rule: Check if the order is in a cancellable state.
-		if order.Status != models.OrderStatusConfirmed && order.Status != models.OrderStatusProcessing {
+		if order.Status != models.OrderStatusConfirmed && order.Status != models.OrderStatusProcessing && order.Status != models.OrderStatusPendingPayment{
 			s.logger.Warn("attempt to cancel order with non-cancellable status", "order_id", order.ID, "status", order.Status)
 			return fmt.Errorf("order cannot be cancelled. status: %s", order.Status)
 		}
@@ -381,4 +382,71 @@ func (s *orderService) UpdateOrderStatus(
 		
 		return q.OrderRepo.UpdateStatus(ctx, order.ID, status, finalPaymentStatus, trackingNumber, estimatedDeliveryDate)
 	})
+}
+
+// CleanupPendingOrders finds and cancels 'pending_payment' orders older than 'olderThan',
+// and reverts their stock.
+func (s *orderService) CleanupPendingOrders(ctx context.Context, olderThan time.Duration) (int, error) {
+	s.logger.Info("Starting cleanup for pending orders...", "older_than", olderThan)
+	
+	thresholdTime := time.Now().Add(-olderThan)
+	
+	var ordersToClean []*models.Order
+	
+	// First, find all the orders that need to be cleaned up.
+	err := s.store.ExecTx(ctx, func(q *domain.Queries) error {
+		var fetchErr error
+		ordersToClean, fetchErr = q.OrderRepo.FindPendingOrdersOlderThan(ctx, thresholdTime)
+		return fetchErr
+	})
+
+	if err != nil {
+		s.logger.Error("Failed to find pending orders for cleanup", "error", err)
+		return 0, fmt.Errorf("could not find pending orders: %w", err)
+	}
+
+	if len(ordersToClean) == 0 {
+		s.logger.Info("No pending orders found for cleanup.")
+		return 0, nil
+	}
+
+	s.logger.Info("Found pending orders to clean", "count", len(ordersToClean))
+	cleanedCount := 0
+
+	for _, order := range ordersToClean {
+		// Process each order in its own isolated transaction.
+		perOrderErr := s.store.ExecTx(ctx, func(q *domain.Queries) error {
+			// 1. Get the items for this specific order to revert stock.
+			orderItems, itemErr := q.OrderRepo.GetItemsByOrderID(ctx, order.ID)
+			if itemErr != nil {
+				return fmt.Errorf("failed to get items for order %d: %w", order.ID, itemErr)
+			}
+
+			// 2. Revert the stock for each item in the order.
+			for _, item := range orderItems {
+				// We add the quantity back to the product's stock.
+				if err := q.ProductRepo.UpdateStock(ctx, item.ProductID, item.Quantity); err != nil {
+					return fmt.Errorf("failed to revert stock for product %d in order %d: %w", item.ProductID, order.ID, err)
+				}
+			}
+
+			// 3. Update the order's status to Cancelled and payment to Failed.
+			cancelledPaymentStatus := models.PaymentStatusFailed
+			if err := q.OrderRepo.UpdateStatus(ctx, order.ID, models.OrderStatusCancelled, cancelledPaymentStatus, nil, nil); err != nil {
+				return fmt.Errorf("failed to update status for order %d: %w", order.ID, err)
+			}
+			
+			return nil
+		})
+
+		if perOrderErr != nil {
+			s.logger.Error("Failed to clean up a single pending order", "order_id", order.ID, "error", perOrderErr)
+		} else {
+			s.logger.Info("Successfully cleaned up pending order", "order_id", order.ID)
+			cleanedCount++
+		}
+	}
+
+	s.logger.Info("Finished cleanup process", "cleaned_count", cleanedCount, "total_found", len(ordersToClean))
+	return cleanedCount, nil
 }

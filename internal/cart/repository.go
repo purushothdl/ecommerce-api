@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	"github.com/purushothdl/ecommerce-api/internal/models"
@@ -196,16 +197,25 @@ func (r *cartRepository) MergeCarts(ctx context.Context, fromCartID, toCartID in
     return err
 }
 
-func (r *cartRepository) CleanupOldAnonymousCartItems(ctx context.Context, olderThanDays int) error {
-    query := `
-        DELETE FROM cart_items 
-        WHERE cart_id IN (
-            SELECT id FROM carts WHERE user_id IS NULL
-        ) 
-        AND created_at < NOW() - INTERVAL '%d days'`
-    
-    _, err := r.db.ExecContext(ctx, fmt.Sprintf(query, olderThanDays))
-    return err
+// CleanupOldAnonymousCarts deletes carts (and their items via CASCADE) that are not
+// associated with a user and have not been updated since the 'olderThan' timestamp.
+func (r *cartRepository) CleanupOldAnonymousCarts(ctx context.Context, olderThan time.Time) (int64, error) {
+	query := `
+        DELETE FROM carts 
+        WHERE user_id IS NULL AND updated_at < $1
+    `
+	
+	result, err := r.db.ExecContext(ctx, query, olderThan)
+	if err != nil {
+		return 0, fmt.Errorf("cart repo: failed to execute cleanup of old anonymous carts: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("cart repo: failed to get rows affected during cart cleanup: %w", err)
+	}
+
+	return rowsAffected, nil
 }
 
 func (r *cartRepository) ClearCart(ctx context.Context, cartID int64) error {
@@ -223,3 +233,4 @@ func (r *cartRepository) ClearCart(ctx context.Context, cartID int64) error {
 
 	return nil
 }
+

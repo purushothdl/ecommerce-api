@@ -172,7 +172,7 @@ func (r *orderRepository) UpdateStatus(
 	estimatedDeliveryDate *time.Time, 
 ) error {
 	query := `UPDATE orders SET status = $1, payment_status = $2, updated_at = NOW()`
-	args := []interface{}{status, paymentStatus}
+	args := []any{status, paymentStatus}
 	placeholder := 3
 
 	if trackingNumber != nil {
@@ -241,4 +241,39 @@ func (r *orderRepository) GetOrderByID(ctx context.Context, id int64) (*models.O
 		return nil, fmt.Errorf("failed to get order by ID: %w", err)
 	}
 	return order, nil
+}
+
+func (r *orderRepository) FindPendingOrdersOlderThan(ctx context.Context, olderThan time.Time) ([]*models.Order, error) {
+	query := `
+        SELECT id, user_id, order_number, status, payment_status, payment_intent_id, created_at
+        FROM orders 
+        WHERE status = $1 AND created_at < $2
+    `
+	rows, err := r.db.QueryContext(ctx, query, models.OrderStatusPendingPayment, olderThan)
+	if err != nil {
+		return nil, fmt.Errorf("order repo: failed to find pending orders: %w", err)
+	}
+	defer rows.Close()
+
+	var orders []*models.Order
+	for rows.Next() {
+		order := &models.Order{}
+		if err := rows.Scan(
+			&order.ID,
+			&order.UserID,
+			&order.OrderNumber,
+			&order.Status,
+			&order.PaymentStatus,
+			&order.PaymentIntentID,
+			&order.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("order repo: failed to scan pending order row: %w", err)
+		}
+		orders = append(orders, order)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("order repo: error iterating rows for pending orders: %w", err)
+	}
+	return orders, nil
 }

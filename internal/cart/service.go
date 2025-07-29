@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/purushothdl/ecommerce-api/internal/domain"
 	"github.com/purushothdl/ecommerce-api/internal/models"
@@ -169,4 +170,29 @@ func (s *cartService) HandleLoginWithTransaction(ctx context.Context, q *domain.
 
     // Delete anonymous cart
     return q.CartRepo.Delete(ctx, anonymousCartID)
+}
+
+// CleanupOldAnonymousCarts orchestrates the deletion of old anonymous cart items.
+func (s *cartService) CleanupOldAnonymousCarts(ctx context.Context, olderThan time.Duration) (int64, error) {
+	s.logger.Info("Starting cleanup for old anonymous carts...", "older_than", olderThan)
+
+	thresholdTime := time.Now().Add(-olderThan)
+
+	var cleanedCount int64
+	var err error
+
+	// This is a single, efficient delete operation, so one transaction is sufficient.
+	err = s.store.ExecTx(ctx, func(q *domain.Queries) error {
+		var txErr error
+		cleanedCount, txErr = q.CartRepo.CleanupOldAnonymousCarts(ctx, thresholdTime)
+		return txErr
+	})
+
+	if err != nil {
+		s.logger.Error("Failed to clean up old anonymous carts", "error", err)
+		return 0, fmt.Errorf("cart service: failed to clean up carts: %w", err)
+	}
+
+	s.logger.Info("Finished cleanup for anonymous carts", "deleted_cart_count", cleanedCount)
+	return cleanedCount, nil
 }

@@ -62,6 +62,7 @@ type CartService interface {
     RemoveProductFromCart(ctx context.Context, cartID int64, productID int64) (*models.Cart, error)
     GetCartContents(ctx context.Context, cartID int64) (*models.Cart, error)
 	HandleLoginWithTransaction(ctx context.Context, q *Queries, userID int64, anonymousCartID int64) error
+	CleanupOldAnonymousCarts(ctx context.Context, olderThan time.Duration) (int64, error)
 }
 
 // AddressService handles user address operations
@@ -80,6 +81,7 @@ type OrderService interface {
 	HandlePaymentSucceeded(ctx context.Context, paymentIntentID string) error
 	ListUserOrders(ctx context.Context, userID int64) ([]*dto.OrderResponse, error) 
 	GetUserOrder(ctx context.Context, userID, orderID int64) (*dto.OrderWithItemsResponse, error) 
+	CleanupPendingOrders(ctx context.Context, olderThan time.Duration) (int, error)
 	CancelOrder(ctx context.Context, userID, orderID int64) error 
 	UpdateOrderStatus(ctx context.Context, orderID int64, status models.OrderStatus, paymentStatus *models.PaymentStatus, trackingNumber *string, estimatedDeliveryDate *time.Time,) error
 }
